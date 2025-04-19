@@ -1,0 +1,908 @@
+#include <iostream>
+#include <vector>
+#include <string>
+#include <typeinfo>
+#include "ASTtree.h"
+
+// Documented possible failure -> won't detect a return statement within a while or a if / if-else body
+
+// In this file, I'll start from the top down, because I can and it makes it easier to have in my head
+std::string type_to_string(RustishType r) {
+    if (r == RustishType::bool_t) {
+        return "bool_t";
+    } else if (r == RustishType::i32_t) {
+        return "i32_t";
+    } else if (r == RustishType::boolarray_t) {
+        return "boolarray_t";
+    } else {
+        return "i32array_t";
+    }
+}
+
+void custom_error(SemanticError *error) {
+    if (error->type_error) {
+       //std::cout << "Type error on line " << error->line_num << "!\n";
+       std::cout << error->msg << "\n";
+    } else {
+       std::cout << error->msg << "\n";
+    }
+}
+
+ASTNode::~ASTNode() {};
+ExpressionNode::ExpressionNode() {};
+void ExpressionNode::check_expression(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) {};
+RustishType ExpressionNode::get_type(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) { return RustishType::i32_t; std::cout << "Expression node get_type shouldn't have been called...\n"; };
+StatementNode::StatementNode() {};
+void StatementNode::check_leaf_expressions(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) {};
+
+ProgramNode::ProgramNode(MainDefNode *main, std::vector<FuncDefNode *> *func_vector):
+    main(main), func_vector(func_vector) {
+        // Construct func_table
+        func_table = new FuncSymbolTable("func_table");
+        for (int i = 0; i < func_vector->size(); i++) {
+            FuncInfo *fun = new FuncInfo;
+            fun->name = *(func_vector->at(i)->name->identifier);
+            if (func_vector->at(i)->return_type != nullptr) {
+                fun->return_type = (func_vector->at(i)->return_type->type);
+                fun->void_func = false;
+            } else {
+                fun->return_type = RustishType::i32_t;
+                fun->void_func = true;
+            }
+            fun->params = *(func_vector->at(i)->params_vector);
+            func_table->insert(fun->name, fun);
+        }
+    };
+
+ProgramNode::~ProgramNode() {
+    delete main;
+    delete func_vector;
+    delete func_table;
+}
+
+void ProgramNode::check_funcs() {
+    for (int i = 0; i < func_vector->size(); i++) {
+        (func_vector)->at(i)->check_body(func_table); // Maybe doesn't work?
+    }
+    main->check_body(func_table);
+}
+
+MainDefNode::MainDefNode(FuncBodyNode *func_body):
+    func_body(func_body) {};
+
+MainDefNode::~MainDefNode() {
+    delete func_body;
+}
+
+void MainDefNode::check_body(FuncSymbolTable *table) {
+    func_body->check_statements(table, new VarSymbolTable("params")); // May cause a memory leak, as this isn't deleted since it was just declareds
+    func_body->check_return_statement(table, new VarSymbolTable("params"), "main");
+}
+
+FuncDefNode::FuncDefNode(IdentifierNode *name, VarSymbolTable *params_list, std::vector<VariableInfo *> *params_vector, TypeNode *return_type, FuncBodyNode *body):
+    name(name), params_list(params_list), params_vector(params_vector), return_type(return_type), body(body) {};
+
+FuncDefNode::~FuncDefNode() {
+    delete name;
+    delete params_list;
+    delete return_type;
+    delete body;
+}
+
+void FuncDefNode::check_body(FuncSymbolTable *global_funcs) {
+    body->check_statements(global_funcs, params_list);
+    body->check_return_statement(global_funcs, params_list, (*name->identifier));
+}
+
+StatementNode::~StatementNode() = default;
+
+ExpressionNode::~ExpressionNode() = default;
+
+FuncBodyNode::FuncBodyNode(VarSymbolTable *local_var_decs, std::vector<StatementNode *> *statement_list, int line_num):
+    local_var_decs(local_var_decs), statement_list(statement_list), line_num(line_num) {};
+
+FuncBodyNode::~FuncBodyNode() {
+    delete local_var_decs;
+    delete statement_list;
+}
+
+void FuncBodyNode::check_statements(FuncSymbolTable *funcs, VarSymbolTable *params) {
+    for (int i = 0; i < statement_list->size(); i++) {
+        statement_list->at(i)->check_leaf_expressions(funcs, params, local_var_decs);
+    }
+}
+
+void FuncBodyNode::check_return_statement(FuncSymbolTable *funcs, VarSymbolTable *params, std::string func) {
+    int innaccurate_returns = 0;
+    for (int i = 0; i < statement_list->size(); i++) {
+        // According to stack overflow, a dynamic cast will return NULL if the class is not of that type
+        if (auto ret_stmt = dynamic_cast<ReturnStatementNode *>(statement_list->at(i))) {
+            if (ret_stmt->special_check(funcs, params, local_var_decs, func)) {
+                innaccurate_returns++;
+            }
+        }
+    }
+    if (innaccurate_returns != 0) { // Only makes sure there is A correct return path - not that EVERY path returns correctly
+        SemanticError *err = new SemanticError;
+        err->line_num = line_num;
+        err->type_error = false;
+        err->msg = "Function ";
+        err->msg.append(func);
+        err->msg.append(" had no return statement matching type ");
+        if (func != "main") {
+            if (!funcs->lookup(func)->void_func) {
+                err->msg.append(type_to_string(funcs->lookup(func)->return_type));
+            } else {
+                err->msg.append("void -- thus, a return statement had a non-void return value");
+            }
+        } else {
+            err->msg.append("void -- thus, a return statement had a non-void return value");
+        }
+        err->msg.append("!\n");
+        custom_error(err);
+        delete err;
+    } else {
+        if (funcs->lookup(func) && !funcs->lookup(func)->void_func) {
+            SemanticError *err = new SemanticError;
+            err->line_num = line_num;
+            err->type_error = false;
+            err->msg = "Function ";
+            err->msg.append(func);
+            err->msg.append(" had no return statement matching type ");
+            if (funcs->lookup(func)->return_type == RustishType::i32_t) {
+                err->msg.append("i32_t!");
+            } else {
+                err->msg.append("bool_t");
+            }
+            custom_error(err);
+            delete err;
+        }
+    }
+}
+
+VarDecNode::VarDecNode(IdentifierNode *identifier, TypeNode *type):
+    identifier(identifier), type(type) {};
+
+VarDecNode::~VarDecNode() {
+    delete identifier;
+    delete type;
+}
+
+ReturnStatementNode::ReturnStatementNode(ExpressionNode *expression):
+    expression(expression) {};
+
+ReturnStatementNode::~ReturnStatementNode() {
+    delete expression;
+}
+
+void ReturnStatementNode::check_leaf_expressions(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) {
+    expression->check_expression(func_defs, params, local_vars);
+}
+
+bool ReturnStatementNode::special_check(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars, std::string func) {
+    // We also have to check the return type of this statement against the type returned by this function in the func_defs table, which is why this is a special check
+    if (expression != nullptr && func_defs->lookup(func)->void_func) {
+        SemanticError *err = new SemanticError;
+        err->line_num = expression->line_num;
+        err->type_error = true;
+        err->msg = "Return type on line ";
+        err->msg.append(std::to_string(err->line_num));
+        err->msg.append(" was not null, but type was not specified in the function declaration!\n");
+        custom_error(err);
+        delete err;
+        return false;
+    }
+    else if (expression == nullptr && !func_defs->lookup(func)->void_func) {
+        SemanticError *err = new SemanticError;
+        err->line_num = expression->line_num;
+        err->type_error = true;
+        err->msg = "Return type on line ";
+        err->msg.append(std::to_string(err->line_num));
+        err->msg.append(" was null, but type was specified in the function declaration!\n");
+        custom_error(err);
+        delete err;
+        return false;
+    }
+    else if (func_defs->lookup(func)->return_type != expression->get_type(func_defs, params, local_vars)) {
+        SemanticError *err = new SemanticError;
+        // Expression->line_num is a garbage value, so
+        err->line_num = func_defs->lookup(func)->line_num;
+        err->type_error = true;
+        err->msg = "A return statement returned a type for function on line ";
+        err->msg.append(std::to_string(err->line_num));
+        err->msg.append(" that was not the return type stated in the function declaration!");
+        custom_error(err);
+        delete err;
+        return false;
+    }
+    return true;
+}
+
+FuncCallStatementNode::FuncCallStatementNode(FuncCallExpressionNode *func_call_exp):
+    func_call_exp(func_call_exp) {};
+
+FuncCallStatementNode::~FuncCallStatementNode() {
+    delete func_call_exp;
+}
+
+void FuncCallStatementNode::check_leaf_expressions(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) {
+    func_call_exp->check_expression(func_defs, params, local_vars);
+    // This check expression should check if the params match, as it has all of the information while the statement doesn't necessarily
+}
+
+WhileStatementNode::WhileStatementNode(ExpressionNode *condition, std::vector<StatementNode *> *statement_list):
+    condition(condition), statement_list(statement_list) {};
+
+WhileStatementNode::~WhileStatementNode() {
+    delete condition;
+    delete statement_list;
+}
+
+void WhileStatementNode::check_leaf_expressions(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) {
+    condition->check_expression(func_defs, params, local_vars);
+    for (int i = 0; i < statement_list->size(); i++) {
+        statement_list->at(i)->check_leaf_expressions(func_defs, params, local_vars);
+    }
+    if (condition->get_type(func_defs, params, local_vars) != RustishType::bool_t) {
+        SemanticError *err = new SemanticError;
+        err->line_num = condition->line_num;
+        err->type_error = true;
+        err->msg = "Condition in while statement on line ";
+        err->msg.append(std::to_string(err->line_num));
+        err->msg.append(" was not of type bool_t!");
+        custom_error(err);
+        delete err;
+    }
+}
+
+IfElseStatementNode::IfElseStatementNode(ExpressionNode *condition, std::vector<StatementNode *> *if_statement_list, std::vector<StatementNode *> *else_statement_list):
+    condition(condition), if_statement_list(if_statement_list), else_statement_list(else_statement_list) {};
+
+IfElseStatementNode::~IfElseStatementNode() {
+    delete condition;
+    delete if_statement_list;
+    delete else_statement_list;
+}
+
+void IfElseStatementNode::check_leaf_expressions(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) {
+    condition->check_expression(func_defs, params, local_vars);
+    for (int i = 0; i < if_statement_list->size(); i++) {
+        if_statement_list->at(i)->check_leaf_expressions(func_defs, params, local_vars);
+    }
+    for (int i = 0; i < else_statement_list->size(); i++) {
+        else_statement_list->at(i)->check_leaf_expressions(func_defs, params, local_vars);
+    }
+    if (condition->get_type(func_defs, params, local_vars) != RustishType::bool_t) {
+        SemanticError *err = new SemanticError;
+        err->line_num = condition->line_num;
+        err->type_error = true;
+        err->msg = "Condition in if-else statement on line ";
+        err->msg.append(std::to_string(err->line_num));
+        err->msg.append(" was not of type bool_t!");
+        custom_error(err);
+        delete err;
+    }
+}
+
+IfStatementNode::IfStatementNode(ExpressionNode *condition, std::vector<StatementNode *> *statement_list):
+    condition(condition), statement_list(statement_list) {};
+
+IfStatementNode::~IfStatementNode() {
+    delete condition;
+    delete statement_list;
+}
+
+void IfStatementNode::check_leaf_expressions(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) {
+    condition->check_expression(func_defs, params, local_vars);
+    for (int i = 0; i < statement_list->size(); i++) {
+        statement_list->at(i)->check_leaf_expressions(func_defs, params, local_vars);
+    }
+    if (condition->get_type(func_defs, params, local_vars) != RustishType::bool_t) {
+        SemanticError *err = new SemanticError;
+        err->line_num = condition->line_num;
+        err->type_error = true;
+        err->msg = "Condition in if-else statement on line ";
+        err->msg.append(std::to_string(err->line_num));
+        err->msg.append(" was not of type bool_t!");
+        custom_error(err);
+        delete err;
+    }
+}
+
+PrintlnStatementNode::PrintlnStatementNode(std::vector<ExpressionNode *> *used_args):
+    used_args(used_args) {};
+
+PrintlnStatementNode::~PrintlnStatementNode() {
+    delete used_args;
+}
+
+void PrintlnStatementNode::check_leaf_expressions(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) {
+    for (int i = 0; i < used_args->size(); i++) {
+        used_args->at(i)->check_expression(func_defs, params, local_vars);
+    }
+}
+
+PrintStatementNode::PrintStatementNode(std::vector<ExpressionNode *> *used_args):
+    used_args(used_args) {};
+
+PrintStatementNode::~PrintStatementNode() {
+    delete used_args;
+}
+
+void PrintStatementNode::check_leaf_expressions(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) {
+    for (int i = 0; i < used_args->size(); i++) {
+        used_args->at(i)->check_expression(func_defs, params, local_vars);
+    }
+}
+
+ArrayAssignmentStatementNode::ArrayAssignmentStatementNode(IdentifierNode *identifier, ExpressionNode *index, ExpressionNode *expression):
+    identifier(identifier), index(index), expression(expression) {};
+
+ArrayAssignmentStatementNode::~ArrayAssignmentStatementNode() {
+    delete identifier;
+    delete index;
+    delete expression;
+}
+
+void ArrayAssignmentStatementNode::check_leaf_expressions(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) {
+    // Throw an error if the identifier isn't of the type array, if index doesn't work out as an int, or if expression doesn't evaluate to the type of array
+    VariableInfo *var = params->lookup(*(identifier->identifier)); // How does this even work? Idk
+    if (var == nullptr) {
+        var = local_vars->lookup(*(identifier->identifier));
+    }
+    // If it isn't found in either, throw an error
+    if (var == nullptr) {
+        SemanticError *err = new SemanticError;
+        err->line_num = expression->line_num;
+        err->type_error = false;
+        err->msg = "Array identifier on line ";
+        err->msg.append(std::to_string(err->line_num));
+        err->msg.append(" was not declared!");
+        custom_error(err);
+        delete err;
+    }
+    // Check the expression next
+    expression->check_expression(func_defs, params, local_vars);
+    index->check_expression(func_defs, params, local_vars);
+
+    // Now, if index isn't an int, throw an error
+    if (index->get_type(func_defs, params, local_vars) != RustishType::i32_t) {
+        SemanticError *err = new SemanticError;
+        err->line_num = identifier->line_num;
+        err->type_error = true;
+        err->msg = "Array index on line ";
+        err->msg.append(std::to_string(err->line_num));
+        err->msg.append(" was not of type i32!");
+        custom_error(err);
+        delete err;
+    }
+}
+
+AssignmentStatementNode::AssignmentStatementNode(IdentifierNode *identifier, ExpressionNode *expression):
+    identifier(identifier), expression(expression) {};
+
+AssignmentStatementNode::~AssignmentStatementNode() {
+    delete identifier;
+    delete expression;
+}
+
+void AssignmentStatementNode::check_leaf_expressions(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) {
+    //std::cout << "Checking assignment with identifier " << *identifier->identifier << " with a line number of " << identifier->line_num << "\n";
+    // First, check identifier
+    if (params->lookup(*(identifier->identifier)) == nullptr && local_vars->lookup(*(identifier->identifier)) == nullptr) {
+        SemanticError *err = new SemanticError;
+        err->line_num = identifier->line_num;
+        err->type_error = false;
+        err->msg = "lvalue identifier on line ";
+        err->msg.append(std::to_string(err->line_num));
+        err->msg.append(" was not declared!");
+        custom_error(err);
+        delete err;
+        return;
+    }
+    // Next, check expression
+    expression->check_expression(func_defs, params, local_vars);
+
+    // Next, check if identifier and expression type are equal
+    VariableInfo *var = params->lookup(*(identifier->identifier));
+    if (var == nullptr) {
+        var = local_vars->lookup(*(identifier->identifier));
+    }
+    var->initialized = true;
+    if (var->type != expression->get_type(func_defs, params, local_vars)) {
+        SemanticError *err = new SemanticError;
+        err->line_num = identifier->line_num;
+        err->type_error = true;
+        err->msg = "rvalue expression on line ";
+        err->msg.append(std::to_string(err->line_num));
+        err->msg.append(" had a different type than the lvalue in the assignment!");
+        custom_error(err);
+        delete err;
+    }
+}
+
+OtherOpStatementNode::OtherOpStatementNode(IdentifierNode *identifier, ExpressionNode *operand, OtherOperators op):
+    identifier(identifier), operand(operand), op(op) {};
+
+OtherOpStatementNode::~OtherOpStatementNode() {
+    delete identifier;
+    delete operand;
+}
+
+void OtherOpStatementNode::check_leaf_expressions(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) {
+    VariableInfo *var = params->lookup(*identifier->identifier);
+    if (var == nullptr) {
+        var = local_vars->lookup(*identifier->identifier);
+    }
+    if (var == nullptr) {
+        SemanticError *err = new SemanticError;
+        err->line_num = operand->line_num;
+        err->type_error = false;
+        err->msg = "lvalue identifier on line ";
+        err->msg.append(std::to_string(err->line_num));
+        err->msg.append(" was not declared!");
+        custom_error(err);
+        delete err;
+        return;
+    }
+
+    if (operand->get_type(func_defs, params, local_vars) == RustishType::i32_t) {
+        SemanticError *err = new SemanticError;
+        err->line_num = operand->line_num;
+        err->type_error = true;
+        err->msg = "Operand on line ";
+        err->msg.append(std::to_string(err->line_num));
+        err->msg.append(" was not of type i32!\n");
+    }
+    operand->check_expression(func_defs, params, local_vars);
+}
+
+// Hooray, statements are done!!!
+// Now... expressions :/
+
+ArrayLengthExpressionNode::ArrayLengthExpressionNode(IdentifierNode *array, int line_num):
+    array(array), line_num(line_num) {};
+
+ArrayLengthExpressionNode::~ArrayLengthExpressionNode() {
+    delete array;
+}
+
+void ArrayLengthExpressionNode::check_expression(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) {
+    // Check the symbol validity
+    VariableInfo *var = params->lookup(*array->identifier);
+    if (var == nullptr) {
+        var = local_vars->lookup(*array->identifier);
+    }
+
+    if (var == nullptr) {
+        SemanticError *err = new SemanticError;
+        err->line_num = line_num;
+        err->type_error = false;
+        err->msg = "Array lvalue of .len on line ";
+        err->msg.append(std::to_string(err->line_num));
+        err->msg.append(" was not declared!");
+        custom_error(err);
+        delete err;
+        return;
+    }
+    // No other error types are possible, so
+}
+
+RustishType ArrayLengthExpressionNode::get_type(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) {
+    return RustishType::i32_t; // Don't throw an error here if it isn't found in the symbol table, as that already happened once
+}
+
+ArrayAccessExpressionNode::ArrayAccessExpressionNode(IdentifierNode *array, ExpressionNode *index, int line_num):
+    array(array), index(index), line_num(line_num) {};
+
+ArrayAccessExpressionNode::~ArrayAccessExpressionNode() {
+    delete array;
+    delete index;
+}
+
+void ArrayAccessExpressionNode::check_expression(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) {
+    VariableInfo *var = params->lookup(*array->identifier);
+    if (var == nullptr) {
+        var = local_vars->lookup(*array->identifier);
+    }
+    if (var == nullptr) {
+        SemanticError *err = new SemanticError;
+        err->line_num = line_num;
+        err->type_error = false;
+        err->msg = "Array accessed on line ";
+        err->msg.append(std::to_string(err->line_num));
+        err->msg.append(" was not declared!");
+        custom_error(err);
+        delete err;
+        return;
+    } else {
+        if (var->type == RustishType::bool_t || var->type == RustishType::i32_t) {
+            SemanticError *err = new SemanticError;
+            err->line_num = line_num;
+            err->type_error = true;
+            err->msg = "Array accessed on line ";
+            err->msg.append(std::to_string(err->line_num));
+            err->msg.append(" was not an array!");
+            custom_error(err);
+            delete err;
+            return;
+        }
+    }
+    // Now check type of index
+    if (index->get_type(func_defs, params, local_vars) != RustishType::i32_t) {
+        SemanticError *err = new SemanticError;
+        err->line_num = line_num;
+        err->type_error = true;
+        err->msg = "Index of array accessed on line ";
+        err->msg.append(std::to_string(err->line_num));
+        err->msg.append(" was not of type i32!");
+        custom_error(err);
+        delete err;
+        return;
+    }
+    index->check_expression(func_defs, params, local_vars);
+}
+
+RustishType ArrayAccessExpressionNode::get_type(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) {
+    VariableInfo *var = local_vars->lookup(*array->identifier);
+    if (var == nullptr) {
+        var = params->lookup(*array->identifier);
+    }
+    if (var == nullptr) {
+        return RustishType::i32_t; // Error! But we've likely already thrown the error, so
+    } else {
+        if (var->type == RustishType::boolarray_t) {
+            return RustishType::bool_t;
+        } else {
+            return RustishType::i32_t; // Again, should throw error if it isn't a i32_array but it would've already done it
+        }
+    }
+}
+
+UnaryMinusExpressionNode::UnaryMinusExpressionNode(ExpressionNode *operand, int line_num):
+    operand(operand), line_num(line_num) {};
+
+UnaryMinusExpressionNode::~UnaryMinusExpressionNode() {
+    delete operand;
+}
+
+void UnaryMinusExpressionNode::check_expression(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) {
+    if (operand->get_type(func_defs, params, local_vars) != RustishType::i32_t) {
+        SemanticError *err = new SemanticError;
+        err->line_num = line_num;
+        err->type_error = true;
+        err->msg = "Operand in unary minus on line ";
+        err->msg.append(std::to_string(err->line_num));
+        err->msg.append(" was not of type i32!");
+        custom_error(err);
+        delete err;
+        return;
+    }
+    operand->check_expression(func_defs, params, local_vars);
+}
+
+RustishType UnaryMinusExpressionNode::get_type(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) {
+    return RustishType::i32_t;
+}
+
+NotExpressionNode::NotExpressionNode(ExpressionNode *operand, int line_num):
+    operand(operand), line_num(line_num) {};
+
+NotExpressionNode::~NotExpressionNode() {
+    delete operand;
+}
+
+void NotExpressionNode::check_expression(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) {
+    if (operand->get_type(func_defs, params, local_vars) != RustishType::bool_t) {
+        SemanticError *err = new SemanticError;
+        err->line_num = line_num;
+        err->type_error = true;
+        err->msg = "Operand in not expression on line ";
+        err->msg.append(std::to_string(err->line_num));
+        err->msg.append(" was not of type bool!");
+        custom_error(err);
+        delete err;
+        return;
+    }
+    operand->check_expression(func_defs, params, local_vars);
+}
+
+RustishType NotExpressionNode::get_type(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) {
+    return RustishType::bool_t;
+}
+
+FalseExpressionNode::FalseExpressionNode(int line_num):
+    line_num(line_num) {};
+
+FalseExpressionNode::~FalseExpressionNode() {};
+
+void FalseExpressionNode::check_expression(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) {} // Nothing to do here
+
+RustishType FalseExpressionNode::get_type(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) {return RustishType::bool_t; };
+
+TrueExpressionNode::TrueExpressionNode(int line_num):
+    line_num(line_num) {};
+
+TrueExpressionNode::~TrueExpressionNode() {};
+
+void TrueExpressionNode::check_expression(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) {} // Nothing to do here
+
+RustishType TrueExpressionNode::get_type(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) {return RustishType::bool_t; };
+
+ReadExpressionNode::ReadExpressionNode(int line_num):
+    line_num(line_num) {};
+
+ReadExpressionNode::~ReadExpressionNode() {};
+
+void ReadExpressionNode::check_expression(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) {};
+
+RustishType ReadExpressionNode::get_type(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) {return RustishType::i32_t; };
+
+BinaryExpressionNode::BinaryExpressionNode(ExpressionNode *left_operand, ExpressionNode *right_operand, BinaryOperator op, int line_num):
+    left_operand(left_operand), right_operand(right_operand), op(op), line_num(line_num) {};
+
+BinaryExpressionNode::~BinaryExpressionNode() {
+    delete left_operand;
+    delete right_operand;
+}
+
+void BinaryExpressionNode::check_expression(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) {
+    left_operand->check_expression(func_defs, params, local_vars);
+    right_operand->check_expression(func_defs, params, local_vars);
+    // Check for type problems
+    if (op == BinaryOperator::AND_OP || op == BinaryOperator::OR_OP) {
+        // Check for bools
+        if (left_operand->get_type(func_defs, params, local_vars) != RustishType::bool_t) {
+            SemanticError *err = new SemanticError;
+            err->line_num = line_num;
+            err->type_error = true;
+            err->msg = "left operand in binary expression on line ";
+            err->msg.append(std::to_string(err->line_num));
+            err->msg.append(" was not of type bool, but operator was a bool operator!");
+            custom_error(err);
+            delete err;
+        }
+        if (right_operand->get_type(func_defs, params, local_vars) != RustishType::bool_t) {
+            SemanticError *err = new SemanticError;
+            err->line_num = line_num;
+            err->type_error = true;
+            err->msg = "right operand in binary expression on line ";
+            err->msg.append(std::to_string(err->line_num));
+            err->msg.append(" was not of type bool, but operator was a bool operator!");
+            custom_error(err);
+            delete err;
+        }
+        return;
+    } else {
+        // Check for ints
+        if (left_operand->get_type(func_defs, params, local_vars) != RustishType::i32_t) {
+            SemanticError *err = new SemanticError;
+            err->line_num = line_num;
+            err->type_error = true;
+            err->msg = "left operand in binary expression on line ";
+            err->msg.append(std::to_string(err->line_num));
+            err->msg.append(" was not of type i32, but operator was an integer operator!");
+            custom_error(err);
+            delete err;
+        }
+        if (right_operand->get_type(func_defs, params, local_vars) != RustishType::i32_t) {
+            SemanticError *err = new SemanticError;
+            err->line_num = line_num;
+            err->type_error = true;
+            err->msg = "right operand in binary expression on line ";
+            err->msg.append(std::to_string(err->line_num));
+            err->msg.append(" was not of type i32, but operator was an integer operator!");
+            custom_error(err);
+            delete err;
+        }
+        return;
+    }
+}
+
+RustishType BinaryExpressionNode::get_type(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) {
+    if (op == BinaryOperator::AND_OP || op == BinaryOperator::OR_OP || op == BinaryOperator::NE_OP || op == BinaryOperator::EQ_OP
+    || op == BinaryOperator::LT_OP || op == BinaryOperator::LE_OP || op == BinaryOperator::GE_OP || op == BinaryOperator::GT_OP) {
+        return RustishType::bool_t;
+    } else {
+        return RustishType::i32_t;
+    }
+}
+
+IdentifierExpressionNode::IdentifierExpressionNode(IdentifierNode *identifier, int line_num):
+    identifier(identifier), line_num(line_num) {};
+
+IdentifierExpressionNode::~IdentifierExpressionNode() {
+    delete identifier;
+}
+
+void IdentifierExpressionNode::check_expression(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) {
+    VariableInfo *var = params->lookup(*identifier->identifier);
+    if (var == nullptr) {
+        var = local_vars->lookup(*identifier->identifier);
+    }
+
+    if (var != nullptr && !var->initialized && (var->type == RustishType::i32_t || var->type == RustishType::bool_t)) { // Arrays don't need to be initialized --- TODO
+        SemanticError *err = new SemanticError;
+        err->line_num = line_num;
+        err->type_error = false;
+        err->msg = "Identifier ";
+        err->msg.append(*identifier->identifier);
+        err->msg.append(" on line ");
+        err->msg.append(std::to_string(err->line_num));
+        err->msg.append(" was not assigned yet!");
+        custom_error(err);
+        delete err;
+    }
+
+    FuncInfo *func = func_defs->lookup(*identifier->identifier);
+
+    if (var == nullptr && func == nullptr) {
+        SemanticError *err = new SemanticError;
+        err->line_num = line_num;
+        err->type_error = false;
+        err->msg = "Identifier ";
+        err->msg.append(*identifier->identifier);
+        err->msg.append(" on line ");
+        err->msg.append(std::to_string(err->line_num));
+        err->msg.append(" was not declared!");
+        custom_error(err);
+        delete err;
+    }
+}
+
+RustishType IdentifierExpressionNode::get_type(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) {
+    VariableInfo *var = params->lookup(*identifier->identifier);
+    if (var == nullptr) {
+        var = local_vars->lookup(*identifier->identifier);
+    }
+    if (var != nullptr) {
+        return var->type;
+    } else {
+        FuncInfo *func = func_defs->lookup(*identifier->identifier);
+        if (func != nullptr && !func->void_func) {
+            return func->return_type;
+        } else if (func != nullptr) {
+            // Error, since we shouldn't be getting the type of this expression since it evaluates to nothing
+            SemanticError *err = new SemanticError;
+            err->line_num = line_num;
+            err->type_error = true;
+            err->msg = "Function identifier on line ";
+            err->msg.append(std::to_string(err->line_num));
+            err->msg.append(" was void, but seems to be used as a valid value!");
+            custom_error(err);
+            delete err;
+        } else {
+            SemanticError *err = new SemanticError;
+            err->line_num = line_num;
+            err->type_error = false;
+            err->msg = "Identifier ";
+            err->msg.append(*identifier->identifier);
+            err->msg.append(" on line ");
+            err->msg.append(std::to_string(err->line_num));
+            err->msg.append(" was not declared!");
+            custom_error(err);
+            delete err;
+        }
+    }
+    return RustishType::i32_t;
+}
+
+NumberExpressionNode::NumberExpressionNode(NumberNode *number, int line_num):
+    number(number), line_num(line_num) {};
+
+NumberExpressionNode::~NumberExpressionNode() {
+    delete number;
+}
+
+void NumberExpressionNode::check_expression(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) {
+    return; // A number literal need not stoop so low as to check this
+}
+
+RustishType NumberExpressionNode::get_type(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) {
+    return RustishType::i32_t;
+}
+
+FuncCallExpressionNode::FuncCallExpressionNode(IdentifierNode *identifier, std::vector<ExpressionNode *> *used_args, int line_num):
+    identifier(identifier), used_args(used_args), line_num(line_num) {};
+
+FuncCallExpressionNode::~FuncCallExpressionNode() {
+    delete identifier;
+    delete used_args;
+}
+
+void FuncCallExpressionNode::check_expression(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) {
+    FuncInfo *func = func_defs->lookup(*identifier->identifier);
+    if (func != nullptr) {
+        // Check each parameter to make sure they are in the symbol table AND are typed correctly
+        for (int i = 0; i < used_args->size(); i++) {
+            used_args->at(i)->check_expression(func_defs, params, local_vars);
+
+            // Also check for order, with func_info -- this implicitly does that
+            if (i < func->params.size()) {
+                if (used_args->at(i)->get_type(func_defs, params, local_vars) != func->params.at(i)->type) {
+                    SemanticError *err = new SemanticError;
+                    err->line_num = line_num;
+                    err->type_error = false;
+                    err->msg = "Parameter ";
+                    err->msg.append(std::to_string(i));
+                    err->msg.append(" of function call on line ");
+                    err->msg.append(std::to_string(err->line_num));
+                    err->msg.append(" did not have the correct type!");
+                    custom_error(err);
+                    delete err;
+                }
+            } else {
+                SemanticError *err = new SemanticError;
+                err->line_num = line_num;
+                err->type_error = false;
+                err->msg = "Parameter ";
+                err->msg.append(std::to_string(i));
+                err->msg.append(" of function call on line ");
+                err->msg.append(std::to_string(err->line_num));
+                err->msg.append(" was extra, i.e. not included in the function definition!");
+                custom_error(err);
+                delete err;
+            }
+        }
+        if (used_args->size() < func->params.size()) {
+            SemanticError *err = new SemanticError;
+            err->line_num = line_num;
+            err->type_error = false;
+            err->msg.append("Function call on line ");
+            err->msg.append(std::to_string(err->line_num));
+            err->msg.append(" didn't have enough parameters!");
+            custom_error(err);
+            delete err;
+        }
+    } else {
+        SemanticError *err = new SemanticError;
+        err->line_num = line_num;
+        err->type_error = false;
+        err->msg = "Function call on line ";
+        err->msg.append(std::to_string(err->line_num));
+        err->msg.append(" did not have a declared function!");
+        custom_error(err);
+        delete err;
+    }
+}
+
+RustishType FuncCallExpressionNode::get_type(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) {
+    FuncInfo *func = func_defs->lookup(*identifier->identifier);
+    if (func != nullptr) {
+        if (!func->void_func) {
+            return func->return_type;
+        }
+        else {
+            SemanticError *err = new SemanticError;
+            err->line_num = line_num;
+            err->type_error = false;
+            err->msg = "Function call on line ";
+            err->msg.append(std::to_string(err->line_num));
+            err->msg.append(" calls a void function, but is used like a value!");
+            custom_error(err);
+            delete err;
+            return RustishType::i32_t;
+        }
+    }
+    // Function isn't found - already threw an error
+    return RustishType::i32_t;
+}
+
+IdentifierNode::IdentifierNode(std::string *identifier, int line_num):
+    identifier(identifier), line_num(line_num) {};
+
+IdentifierNode::~IdentifierNode() {
+    delete identifier;
+}
+
+NumberNode::NumberNode(std::string *number, int line_num):
+    number(number), line_num(line_num) {};
+
+NumberNode::~NumberNode() {
+    delete number;
+}
+
+TypeNode::TypeNode(RustishType type):
+    type(type) {};
+
+TypeNode::~TypeNode() {};
