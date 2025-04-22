@@ -58,4 +58,4 @@ parse.tab.cpp: rustish_parser_file.y
 
 clean:
 	/bin/rm -f *.o *.yy.c *.yy.cpp *.tab.cpp *.tab.c *.tab.hpp \
-	           core *.output *.temp *~ calc 
+	           core *.output *.temp *~ calc *.asm

@@ -1,10 +1,20 @@
 #include <iostream>
+#include <fstream>
 #include <vector>
 #include <string>
 #include <typeinfo>
 #include "ASTtree.h"
 
 // Documented possible failure -> won't detect a return statement within a while or a if / if-else body
+
+// Innefficient - make a struct with this file ofstream, and give it a global and local stack offset - local should be set every function call
+void write_code(AssemblyContext* context, std::string line) {
+    context->output << line << "\n";
+    context->output.flush();
+}
+
+AssemblyContext::AssemblyContext() {}
+AssemblyContext::~AssemblyContext() {}
 
 // In this file, I'll start from the top down, because I can and it makes it easier to have in my head
 std::string type_to_string(RustishType r) {
@@ -22,13 +32,15 @@ std::string type_to_string(RustishType r) {
 void custom_error(SemanticError *error) {
     if (error->type_error) {
        //std::cout << "Type error on line " << error->line_num << "!\n";
-       std::cout << error->msg << "\n";
+       //std::cout << error->msg << "\n";
     } else {
-       std::cout << error->msg << "\n";
+       //std::cout << error->msg << "\n";
     }
+    std::cout << "(Err)";
 }
 
 ASTNode::~ASTNode() {};
+void ASTNode::emit_code(AssemblyContext *context) {};
 ExpressionNode::ExpressionNode() {};
 void ExpressionNode::check_expression(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) {};
 RustishType ExpressionNode::get_type(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) { return RustishType::i32_t; std::cout << "Expression node get_type shouldn't have been called...\n"; };
@@ -67,11 +79,32 @@ void ProgramNode::check_funcs() {
     main->check_body(func_table);
 }
 
+void ProgramNode::emit_code(AssemblyContext* context) {
+    // Normally, .data section would be full of decls from the variable table
+    // Not yet tho - one step at a time
+
+    write_code(context, ".data");
+    write_code(context, "_newline_char: .asciiz \"\\n\"");
+    write_code(context, "_bool_true: .asciiz \"true\"");
+    write_code(context, "_bool_false: .asciiz \"false\"");
+    write_code(context, "# Will get filled in when we add variables");
+    write_code(context, ""); // Maybe needs a tab? idk
+    write_code(context, ".text");
+    write_code(context, "# All the labels for functions, including main: globl makes a label accessible across the entire program");
+    main->emit_code(context);
+}
+
 MainDefNode::MainDefNode(FuncBodyNode *func_body):
     func_body(func_body) {};
 
 MainDefNode::~MainDefNode() {
     delete func_body;
+}
+
+void MainDefNode::emit_code(AssemblyContext* context) {
+    write_code(context, "main:");
+    write_code(context, "# Now, all the statements that are part of main...");
+    func_body->emit_code(context);
 }
 
 void MainDefNode::check_body(FuncSymbolTable *table) {
@@ -157,6 +190,12 @@ void FuncBodyNode::check_return_statement(FuncSymbolTable *funcs, VarSymbolTable
             custom_error(err);
             delete err;
         }
+    }
+}
+
+void FuncBodyNode::emit_code(AssemblyContext* context) {
+    for (int i = 0; i < statement_list->size(); i++) {
+        statement_list->at(i)->emit_code(context);
     }
 }
 
@@ -322,6 +361,42 @@ void PrintlnStatementNode::check_leaf_expressions(FuncSymbolTable *func_defs, Va
     }
 }
 
+void PrintlnStatementNode::emit_code(AssemblyContext *context) {
+    int current_stack = context->local_stack_pointer; // Anything added to the stack by the expression node will increase the size of context, so we can find the length by just subtracting and % 4
+    for (int i = 0; i < used_args->size(); i++) {
+        used_args->at(i)->emit_code(context); // Pushes the expression's value onto the stack
+        if (used_args->at(i)->type == RustishType::i32_t) {
+            // If it is an integer...
+            // Now, the expression should have added one to the current stack - and $sp now points to the value
+            write_code(context, "# Load value from the stack and print it, with a newline");
+            write_code(context, "lw $a0, ($sp)");
+            write_code(context, "addiu $sp, $sp, -4");
+            context->local_stack_pointer += 4;
+            write_code(context, "li $v0, 1");
+            write_code(context, "syscall");
+        } else if (used_args->at(i)->type == RustishType::bool_t) {
+            // If it is a bool...
+            // Now, the expression should have added one to the current stack - and $sp now points to the value
+            write_code(context, "# Load value from the stack and print it, with a newline");
+            write_code(context, "lw $a0, ($sp)");
+            write_code(context, "addiu $sp, $sp, -4");
+            context->local_stack_pointer += 4;
+            write_code(context, "# Now, is it a true or false? Value is currently in $a0");
+            write_code(context, "beqz $a0, False");
+            write_code(context, "# If it doesn't branch, it is a 1: thus, print true");
+            write_code(context, "lw $a0, _bool_true");
+            write_code(context, "False: ");
+            write_code(context, "    lw $a0, _bool_false");
+            write_code(context, "li $v0, 4");
+            write_code(context, "syscall");
+        }
+        // And the newline
+        write_code(context, "la $a0, _newline_char");
+        write_code(context, "li $v0, 4");
+        write_code(context, "syscall");
+    }
+}
+
 PrintStatementNode::PrintStatementNode(std::vector<ExpressionNode *> *used_args):
     used_args(used_args) {};
 
@@ -332,6 +407,38 @@ PrintStatementNode::~PrintStatementNode() {
 void PrintStatementNode::check_leaf_expressions(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) {
     for (int i = 0; i < used_args->size(); i++) {
         used_args->at(i)->check_expression(func_defs, params, local_vars);
+    }
+}
+
+void PrintStatementNode::emit_code(AssemblyContext *context) {
+    int current_stack = context->local_stack_pointer; // Anything added to the stack by the expression node will increase the size of context, so we can find the length by just subtracting and % 4
+    for (int i = 0; i < used_args->size(); i++) {
+        used_args->at(i)->emit_code(context); // Pushes the expression's value onto the stack
+        if (used_args->at(i)->type == RustishType::i32_t) {
+            // If it is an integer...
+            // Now, the expression should have added one to the current stack - and $sp now points to the value
+            write_code(context, "# Load value from the stack and print it, with a newline");
+            write_code(context, "lw $a0, ($sp)");
+            write_code(context, "addiu $sp, $sp, -4");
+            context->local_stack_pointer += 4;
+            write_code(context, "li $v0, 4");
+            write_code(context, "syscall");
+        } else if (used_args->at(i)->type == RustishType::bool_t) {
+            // If it is a bool...
+            // Now, the expression should have added one to the current stack - and $sp now points to the value
+            write_code(context, "# Load value from the stack and print it, with a newline");
+            write_code(context, "lw $a0, ($sp)");
+            write_code(context, "addiu $sp, $sp, -4");
+            context->local_stack_pointer += 4;
+            write_code(context, "# Now, is it a true or false? Value is currently in $a0");
+            write_code(context, "beqz $a0, False");
+            write_code(context, "# If it doesn't branch, it is a 1: thus, print true");
+            write_code(context, "lw $a0, _bool_true");
+            write_code(context, "False: ");
+            write_code(context, "    lw $a0, _bool_false");
+            write_code(context, "li $v0, 4");
+            write_code(context, "syscall");
+        }
     }
 }
 
@@ -461,7 +568,7 @@ void OtherOpStatementNode::check_leaf_expressions(FuncSymbolTable *func_defs, Va
 // Now... expressions :/
 
 ArrayLengthExpressionNode::ArrayLengthExpressionNode(IdentifierNode *array, int line_num):
-    array(array), line_num(line_num) {};
+    array(array), line_num(line_num) { type = RustishType::i32_t; };
 
 ArrayLengthExpressionNode::~ArrayLengthExpressionNode() {
     delete array;
@@ -493,7 +600,7 @@ RustishType ArrayLengthExpressionNode::get_type(FuncSymbolTable *func_defs, VarS
 }
 
 ArrayAccessExpressionNode::ArrayAccessExpressionNode(IdentifierNode *array, ExpressionNode *index, int line_num):
-    array(array), index(index), line_num(line_num) {};
+    array(array), index(index), line_num(line_num) { /* Type could be boolean OR int */ };
 
 ArrayAccessExpressionNode::~ArrayAccessExpressionNode() {
     delete array;
@@ -549,18 +656,21 @@ RustishType ArrayAccessExpressionNode::get_type(FuncSymbolTable *func_defs, VarS
         var = params->lookup(*array->identifier);
     }
     if (var == nullptr) {
+        type = RustishType::i32_t;
         return RustishType::i32_t; // Error! But we've likely already thrown the error, so
     } else {
         if (var->type == RustishType::boolarray_t) {
+            type = RustishType::bool_t;
             return RustishType::bool_t;
         } else {
+            type = RustishType::i32_t;
             return RustishType::i32_t; // Again, should throw error if it isn't a i32_array but it would've already done it
         }
     }
 }
 
 UnaryMinusExpressionNode::UnaryMinusExpressionNode(ExpressionNode *operand, int line_num):
-    operand(operand), line_num(line_num) {};
+    operand(operand), line_num(line_num) { type = RustishType::i32_t; };
 
 UnaryMinusExpressionNode::~UnaryMinusExpressionNode() {
     delete operand;
@@ -586,7 +696,7 @@ RustishType UnaryMinusExpressionNode::get_type(FuncSymbolTable *func_defs, VarSy
 }
 
 NotExpressionNode::NotExpressionNode(ExpressionNode *operand, int line_num):
-    operand(operand), line_num(line_num) {};
+    operand(operand), line_num(line_num) { type = RustishType::bool_t; };
 
 NotExpressionNode::~NotExpressionNode() {
     delete operand;
@@ -612,7 +722,7 @@ RustishType NotExpressionNode::get_type(FuncSymbolTable *func_defs, VarSymbolTab
 }
 
 FalseExpressionNode::FalseExpressionNode(int line_num):
-    line_num(line_num) {};
+    line_num(line_num) { type = RustishType::bool_t; };
 
 FalseExpressionNode::~FalseExpressionNode() {};
 
@@ -621,7 +731,7 @@ void FalseExpressionNode::check_expression(FuncSymbolTable *func_defs, VarSymbol
 RustishType FalseExpressionNode::get_type(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) {return RustishType::bool_t; };
 
 TrueExpressionNode::TrueExpressionNode(int line_num):
-    line_num(line_num) {};
+    line_num(line_num) { type = RustishType::bool_t; };
 
 TrueExpressionNode::~TrueExpressionNode() {};
 
@@ -630,7 +740,7 @@ void TrueExpressionNode::check_expression(FuncSymbolTable *func_defs, VarSymbolT
 RustishType TrueExpressionNode::get_type(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) {return RustishType::bool_t; };
 
 ReadExpressionNode::ReadExpressionNode(int line_num):
-    line_num(line_num) {};
+    line_num(line_num) { type = RustishType::i32_t; };
 
 ReadExpressionNode::~ReadExpressionNode() {};
 
@@ -702,8 +812,10 @@ void BinaryExpressionNode::check_expression(FuncSymbolTable *func_defs, VarSymbo
 RustishType BinaryExpressionNode::get_type(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) {
     if (op == BinaryOperator::AND_OP || op == BinaryOperator::OR_OP || op == BinaryOperator::NE_OP || op == BinaryOperator::EQ_OP
     || op == BinaryOperator::LT_OP || op == BinaryOperator::LE_OP || op == BinaryOperator::GE_OP || op == BinaryOperator::GT_OP) {
+        type = RustishType::bool_t;
         return RustishType::bool_t;
     } else {
+        type = RustishType::i32_t;
         return RustishType::i32_t;
     }
 }
@@ -756,10 +868,12 @@ RustishType IdentifierExpressionNode::get_type(FuncSymbolTable *func_defs, VarSy
         var = local_vars->lookup(*identifier->identifier);
     }
     if (var != nullptr) {
+        type = var->type;
         return var->type;
     } else {
         FuncInfo *func = func_defs->lookup(*identifier->identifier);
         if (func != nullptr && !func->void_func) {
+            type = func->return_type;
             return func->return_type;
         } else if (func != nullptr) {
             // Error, since we shouldn't be getting the type of this expression since it evaluates to nothing
@@ -771,6 +885,7 @@ RustishType IdentifierExpressionNode::get_type(FuncSymbolTable *func_defs, VarSy
             err->msg.append(" was void, but seems to be used as a valid value!");
             custom_error(err);
             delete err;
+            type = RustishType::i32_t; // Defaults to i32
         } else {
             SemanticError *err = new SemanticError;
             err->line_num = line_num;
@@ -782,13 +897,15 @@ RustishType IdentifierExpressionNode::get_type(FuncSymbolTable *func_defs, VarSy
             err->msg.append(" was not declared!");
             custom_error(err);
             delete err;
+            type = RustishType::i32_t;
         }
     }
+    type = RustishType::i32_t;
     return RustishType::i32_t;
 }
 
 NumberExpressionNode::NumberExpressionNode(NumberNode *number, int line_num):
-    number(number), line_num(line_num) {};
+    number(number), line_num(line_num) { type = RustishType::i32_t; };
 
 NumberExpressionNode::~NumberExpressionNode() {
     delete number;
@@ -800,6 +917,13 @@ void NumberExpressionNode::check_expression(FuncSymbolTable *func_defs, VarSymbo
 
 RustishType NumberExpressionNode::get_type(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) {
     return RustishType::i32_t;
+}
+
+void NumberExpressionNode::emit_code(AssemblyContext *context) {
+    write_code(context, "li $t0 " + *(number->number));
+    write_code(context, "add $sp, $sp, -4");
+    context->local_stack_pointer -= 4;
+    write_code(context, "sw $t0, ($sp)");
 }
 
 FuncCallExpressionNode::FuncCallExpressionNode(IdentifierNode *identifier, std::vector<ExpressionNode *> *used_args, int line_num):
@@ -870,6 +994,7 @@ RustishType FuncCallExpressionNode::get_type(FuncSymbolTable *func_defs, VarSymb
     FuncInfo *func = func_defs->lookup(*identifier->identifier);
     if (func != nullptr) {
         if (!func->void_func) {
+            type = func->return_type;
             return func->return_type;
         }
         else {
@@ -881,10 +1006,12 @@ RustishType FuncCallExpressionNode::get_type(FuncSymbolTable *func_defs, VarSymb
             err->msg.append(" calls a void function, but is used like a value!");
             custom_error(err);
             delete err;
+            type = RustishType::i32_t;
             return RustishType::i32_t;
         }
     }
     // Function isn't found - already threw an error
+    type = RustishType::i32_t;
     return RustishType::i32_t;
 }
 

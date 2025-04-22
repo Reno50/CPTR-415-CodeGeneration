@@ -2,62 +2,38 @@
 
 #include <string>
 #include <iostream>
+#include <fstream>
 #include <vector>
 #include "SymbolTable.h"
 
 /*
-Testing: ~ means error message may be not quite as helpful as it could be
-[X] Assignment of wrong type to a declared variable
-[X] Using an undeclared variable (rvalue)
-[X] Assigning to an undeclared (lvalue)
-[X] Use of an uninitialized variable
-[X] Attempt to call an undefined function
-[X] Passing wrong types of actual arguments to function call
-[X] Passing wrong number of arguments to function call
-[X~] Returning wrong type from function call (also returning something from a "void" function)
-[X~] Missing return from function declared to return i32 or bool
-[X] Mixed arithmetic (i32/bool)
-[X] Arithmetic with bools
-[X] Logical comparison with i32s
-[X] Missing main function
-[X] Missing let, mut, etc
-[X] Non-i32 array indices
-[X] Duplicate function names
-[X] Duplicate local variables
-[X] Non-Boolean expression in an if or while statement
-[X] Variable declaration after executable code within a function definition
-[X] Duplicate param names
-
 Current known problems:
 If/Else statement error line is garbage value
 Array typechecking is iffy
 Array literals don't work yet
 */
 
-// (This comment was made from the start ~ around april 2nd or 3rd or so)
-// My idea for this AST tree is this:  
-/*  Expressions all have check_expression, and get fed multiple symbol tables
-    Based on these symbol tables, they can check the types of their children
-    Thus, typing must also trickle down, since the parser is bottom up - it will not wait for the VarDecNodes to be constructed before tackling the statements
-    get_type is also a trickle-down thing, and stops whenever it hits something with a clear type
-    Still waffling on having a void type, as functions must return something so it wouldn't be usefull in many scenarios
-    Anyway though, get_type usually won't be called directly unless it is in the body of a check_expression function definition, since that is what will be doing the type checking
-    Any variable declarations will disappear, as they will be added to the symbol tree and condensed into the declaration list
+/*
+In this code generation assignment, all code given to our compiler is known to be correct
+ASTNode has a virtual method called emit_code()
+emit_code() writes all code to the file specified in write_code(std::string line), which is defined in ASTtree.cpp
 
-    For semantic naming errors, we check once we form the function list
-    Program must thus have a check_funcs function, which checks whether functions have valid names AND then calls check_statements...
-    functions (including main) should have a check_statements_list that then proceeds to call...
-    statementList should have a function to check each statement, and each statement should have a function to check itself against a given variable symbol table
 */
 
-// Type errors are dealt with in constructors of expression classes as necessary
-// Semantic errors dealing with the symbol tree, however, are top down, as every symbol's validity may depend on things only contained in program
-// Thus, we trickle down from checking functions to checking statement lists to statements to expressions
 
 // The data structure that every token has
 struct TokenData {
     const char *value;
     int line;
+};
+
+class AssemblyContext {
+public:
+    std::ofstream output;
+    int global_stack_pointer;
+    int local_stack_pointer;
+    AssemblyContext();
+    ~AssemblyContext();
 };
 
 enum class BinaryOperator { PLUS_OP, MINUS_OP, TIMES_OP, DIV_OP, MOD_OP,
@@ -69,6 +45,7 @@ enum class OtherOperators { PLUS_OP, MINUS_OP, TIMES_OP, DIV_OP, MOD_OP };
 class ASTNode {
 public:
     virtual ~ASTNode() = 0;
+    virtual void emit_code(AssemblyContext* context); // Emit MIPS
 };
 
 class TypeNode: public ASTNode {
@@ -100,6 +77,7 @@ class ExpressionNode: public ASTNode {
 public:
     // Executive decision (impulsive for sure, but hopefully it works) - every expression has line number information (not sure how to do column)
     int line_num;
+    RustishType type; // Only filled in after checking expressions somtimes, for code gen purposes
     ExpressionNode();
     virtual ~ExpressionNode();
     virtual void check_expression(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars);
@@ -127,6 +105,7 @@ public:
     ~NumberExpressionNode() override;
     void check_expression(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) override; // Probably empty, its literally just a number
     RustishType get_type(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) override; // Just returns int, hopefully obvious
+    void emit_code(AssemblyContext *context); // Emit the MIPS code, store this number on the stack
 };
 
 class IdentifierExpressionNode: public ExpressionNode {
@@ -271,6 +250,7 @@ public:
     PrintStatementNode(std::vector<ExpressionNode *> *used_args);
     ~PrintStatementNode() override;
     void check_leaf_expressions(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) override;
+    void emit_code(AssemblyContext* context);
 };
 
 class PrintlnStatementNode: public StatementNode {
@@ -279,6 +259,7 @@ public:
     PrintlnStatementNode(std::vector<ExpressionNode *> *used_args);
     ~PrintlnStatementNode() override;
     void check_leaf_expressions(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) override;
+    void emit_code(AssemblyContext* context);
 };
 
 class IfStatementNode: public StatementNode {
@@ -343,6 +324,7 @@ public:
     ~FuncBodyNode() override;
     void check_statements(FuncSymbolTable *funcs, VarSymbolTable *params);
     void check_return_statement(FuncSymbolTable *funcs, VarSymbolTable *params, std::string func);
+    void emit_code(AssemblyContext* context) override; // Emit MIPS for the entire function
 };
 
 class FuncDefNode: public ASTNode {
@@ -363,6 +345,7 @@ public:
     MainDefNode(FuncBodyNode *);
     ~MainDefNode() override;
     void check_body(FuncSymbolTable *table);
+    void emit_code(AssemblyContext* context); // Emit MIPS for the main function
 };
 
 class ProgramNode: public ASTNode {
@@ -374,6 +357,7 @@ public:
     ProgramNode(MainDefNode *main, std::vector<FuncDefNode *> *func_vector); // must be a vector so we can go through and check each, but we need to pass a symbol table for convinience of lookup
     ~ProgramNode() override;
     void check_funcs(); // Check each function's validity by calling it's individual check call
+    void emit_code(AssemblyContext* context); // Emit MIPS code for the entire program
 };
 
 extern ProgramNode *abstract_syntax_tree;

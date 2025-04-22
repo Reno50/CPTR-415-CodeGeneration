@@ -89,8 +89,14 @@ a = [1, 2, 3, 4] // This array assignment syntax
 program        : funcDefList mainDef {
                   $$ = new ProgramNode($2, $1); // Main first, then func_def_list
                   //abstract_syntax_tree = $$;
-                  // No need to check functions, as all the code should be valid
-                  // $$->check_funcs();
+                  // No need to check functions, as all the code should be valid, but we do need to trickle up type info
+                  $$->check_funcs();
+                  AssemblyContext* context = new AssemblyContext;
+                  context->output.open("test.asm", std::ios::out | std::ios::app); // Write output only and append it
+                  context->local_stack_pointer = 0;
+                  context->global_stack_pointer = 0;
+                  $$->emit_code(context);
+
                   std::cout << "Done!\n";
                }
 
