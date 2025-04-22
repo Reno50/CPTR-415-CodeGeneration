@@ -7,19 +7,18 @@
 #include "SymbolTable.h"
 
 /*
-Current known problems:
+Current DOCUMENTED known problems:
 If/Else statement error line is garbage value
 Array typechecking is iffy
 Array literals don't work yet
+When checking for return statements, while statements will not have their statements checked - doing a comprehensive data flow analysis is the only way of truly implementing this feature
 */
 
 /*
 In this code generation assignment, all code given to our compiler is known to be correct
 ASTNode has a virtual method called emit_code()
 emit_code() writes all code to the file specified in write_code(std::string line), which is defined in ASTtree.cpp
-
 */
-
 
 // The data structure that every token has
 struct TokenData {
@@ -45,7 +44,7 @@ enum class OtherOperators { PLUS_OP, MINUS_OP, TIMES_OP, DIV_OP, MOD_OP };
 class ASTNode {
 public:
     virtual ~ASTNode() = 0;
-    virtual void emit_code(AssemblyContext* context); // Emit MIPS
+    virtual void emit_code(AssemblyContext* context); // Emit MIPS assembly code
 };
 
 class TypeNode: public ASTNode {

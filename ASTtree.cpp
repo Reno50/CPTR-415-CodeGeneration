@@ -5,9 +5,7 @@
 #include <typeinfo>
 #include "ASTtree.h"
 
-// Documented possible failure -> won't detect a return statement within a while or a if / if-else body
 
-// Innefficient - make a struct with this file ofstream, and give it a global and local stack offset - local should be set every function call
 void write_code(AssemblyContext* context, std::string line) {
     context->output << line << "\n";
     context->output.flush();
@@ -88,7 +86,7 @@ void ProgramNode::emit_code(AssemblyContext* context) {
     write_code(context, "_bool_true: .asciiz \"true\"");
     write_code(context, "_bool_false: .asciiz \"false\"");
     write_code(context, "# Will get filled in when we add variables");
-    write_code(context, ""); // Maybe needs a tab? idk
+    write_code(context, "");
     write_code(context, ".text");
     write_code(context, "# All the labels for functions, including main: globl makes a label accessible across the entire program");
     main->emit_code(context);
@@ -280,6 +278,7 @@ WhileStatementNode::~WhileStatementNode() {
 void WhileStatementNode::check_leaf_expressions(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) {
     condition->check_expression(func_defs, params, local_vars);
     for (int i = 0; i < statement_list->size(); i++) {
+        // Check every statement in the while statement
         statement_list->at(i)->check_leaf_expressions(func_defs, params, local_vars);
     }
     if (condition->get_type(func_defs, params, local_vars) != RustishType::bool_t) {
@@ -305,12 +304,14 @@ IfElseStatementNode::~IfElseStatementNode() {
 
 void IfElseStatementNode::check_leaf_expressions(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) {
     condition->check_expression(func_defs, params, local_vars);
+    // Check all the statements in each clause
     for (int i = 0; i < if_statement_list->size(); i++) {
         if_statement_list->at(i)->check_leaf_expressions(func_defs, params, local_vars);
     }
     for (int i = 0; i < else_statement_list->size(); i++) {
         else_statement_list->at(i)->check_leaf_expressions(func_defs, params, local_vars);
     }
+    // If the If (condition <- ) isn't a boolean
     if (condition->get_type(func_defs, params, local_vars) != RustishType::bool_t) {
         SemanticError *err = new SemanticError;
         err->line_num = condition->line_num;
@@ -332,6 +333,7 @@ IfStatementNode::~IfStatementNode() {
 }
 
 void IfStatementNode::check_leaf_expressions(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) {
+    // Again, check the condition and check each statement in the {} for validity
     condition->check_expression(func_defs, params, local_vars);
     for (int i = 0; i < statement_list->size(); i++) {
         statement_list->at(i)->check_leaf_expressions(func_defs, params, local_vars);
@@ -356,12 +358,15 @@ PrintlnStatementNode::~PrintlnStatementNode() {
 }
 
 void PrintlnStatementNode::check_leaf_expressions(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) {
+    // Just check each used_args, they can be whatever type currently - arrays may result in some undefined behavior though
     for (int i = 0; i < used_args->size(); i++) {
         used_args->at(i)->check_expression(func_defs, params, local_vars);
     }
 }
 
 void PrintlnStatementNode::emit_code(AssemblyContext *context) {
+    // Emit MIPS assembly via write_code
+
     int current_stack = context->local_stack_pointer; // Anything added to the stack by the expression node will increase the size of context, so we can find the length by just subtracting and % 4
     for (int i = 0; i < used_args->size(); i++) {
         used_args->at(i)->emit_code(context); // Pushes the expression's value onto the stack
@@ -389,7 +394,7 @@ void PrintlnStatementNode::emit_code(AssemblyContext *context) {
             write_code(context, "    lw $a0, _bool_false");
             write_code(context, "li $v0, 4");
             write_code(context, "syscall");
-        }
+        } // If it is an array, no mips code is actually put out
         // And the newline
         write_code(context, "la $a0, _newline_char");
         write_code(context, "li $v0, 4");
@@ -405,12 +410,15 @@ PrintStatementNode::~PrintStatementNode() {
 }
 
 void PrintStatementNode::check_leaf_expressions(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) {
+    // Same as println
     for (int i = 0; i < used_args->size(); i++) {
         used_args->at(i)->check_expression(func_defs, params, local_vars);
     }
 }
 
 void PrintStatementNode::emit_code(AssemblyContext *context) {
+    // Same as println, arrays may result in no mips code emitted
+
     int current_stack = context->local_stack_pointer; // Anything added to the stack by the expression node will increase the size of context, so we can find the length by just subtracting and % 4
     for (int i = 0; i < used_args->size(); i++) {
         used_args->at(i)->emit_code(context); // Pushes the expression's value onto the stack
@@ -494,7 +502,6 @@ AssignmentStatementNode::~AssignmentStatementNode() {
 }
 
 void AssignmentStatementNode::check_leaf_expressions(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) {
-    //std::cout << "Checking assignment with identifier " << *identifier->identifier << " with a line number of " << identifier->line_num << "\n";
     // First, check identifier
     if (params->lookup(*(identifier->identifier)) == nullptr && local_vars->lookup(*(identifier->identifier)) == nullptr) {
         SemanticError *err = new SemanticError;
@@ -542,6 +549,7 @@ void OtherOpStatementNode::check_leaf_expressions(FuncSymbolTable *func_defs, Va
         var = local_vars->lookup(*identifier->identifier);
     }
     if (var == nullptr) {
+        // If variable isn't a known identifier, throw an error
         SemanticError *err = new SemanticError;
         err->line_num = operand->line_num;
         err->type_error = false;
@@ -563,9 +571,6 @@ void OtherOpStatementNode::check_leaf_expressions(FuncSymbolTable *func_defs, Va
     }
     operand->check_expression(func_defs, params, local_vars);
 }
-
-// Hooray, statements are done!!!
-// Now... expressions :/
 
 ArrayLengthExpressionNode::ArrayLengthExpressionNode(IdentifierNode *array, int line_num):
     array(array), line_num(line_num) { type = RustishType::i32_t; };
