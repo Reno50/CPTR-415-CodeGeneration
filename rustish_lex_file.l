@@ -175,6 +175,7 @@ identifier [a-zA-Z_]([a-zA-Z]|[0-9]|_)*
     add_token(yylineno, "READ", "");
     return READ;
 }
+
 (0|[1-9][0-9]*) {
     add_token(yylineno, "NUMBER", yytext);
     yylval.token = (TokenData*) malloc(sizeof(TokenData));

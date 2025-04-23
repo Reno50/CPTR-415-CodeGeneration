@@ -176,11 +176,13 @@ type           : I32 {// For each of these, just make a type class with the type
                   $$ = new TypeNode(RustishType::boolarray_t);
                }
 
-funcBody       : LCURLY localVarDecList statementList RCURLY { // Note that this doesn't leave room for variables mixed in with statements :/ Halterman's grammar verbatim
+funcBody       : LCURLY localVarDecList statementList RCURLY { 
+                  // Note that this doesn't leave room for variables mixed in with statements
                   $$ = new FuncBodyNode($2, $3, yylineno); // Vector of varDec, statements
                }
 
-localVarDecList: localVarDecList LET MUT varDec SEMICOLON {// Contains all local variable declarations in a function
+localVarDecList: localVarDecList LET MUT varDec SEMICOLON {
+                  // Contains all local variable declarations in a function
                   $4->initialized = false;
                   $1->insert($4->name, $4); // Insert at beginning
                   $$ = $1;
