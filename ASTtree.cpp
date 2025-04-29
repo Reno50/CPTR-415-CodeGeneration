@@ -5,14 +5,11 @@
 #include <typeinfo>
 #include "ASTtree.h"
 
-
-void write_code(AssemblyContext* context, std::string line) {
-    context->output << line << "\n";
-    context->output.flush();
+void emit_var_lookup(std::ostream &context, int stack_offset, std::string reg) {
+    // Given the stack offset of a variable and the register to write to, emit code to put that variable in that register
+    context << "# Load word at a stack offset of " << stack_offset << " into register " << reg << "\n";
+    context << "lw " << reg << ", " << stack_offset << "($sp)\n"; // I think this is right?
 }
-
-AssemblyContext::AssemblyContext() {}
-AssemblyContext::~AssemblyContext() {}
 
 // In this file, I'll start from the top down, because I can and it makes it easier to have in my head
 std::string type_to_string(RustishType r) {
@@ -28,17 +25,11 @@ std::string type_to_string(RustishType r) {
 }
 
 void custom_error(SemanticError *error) {
-    if (error->type_error) {
-       //std::cout << "Type error on line " << error->line_num << "!\n";
-       //std::cout << error->msg << "\n";
-    } else {
-       //std::cout << error->msg << "\n";
-    }
     std::cout << "(Err)";
 }
 
 ASTNode::~ASTNode() {};
-void ASTNode::emit_code(AssemblyContext *context) {};
+void ASTNode::emit_code(std::ostream &context) {};
 ExpressionNode::ExpressionNode() {};
 void ExpressionNode::check_expression(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) {};
 RustishType ExpressionNode::get_type(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) { return RustishType::i32_t; std::cout << "Expression node get_type shouldn't have been called...\n"; };
@@ -77,19 +68,36 @@ void ProgramNode::check_funcs() {
     main->check_body(func_table);
 }
 
-void ProgramNode::emit_code(AssemblyContext* context) {
+void ProgramNode::emit_code(std::ostream &context) {
     // Normally, .data section would be full of decls from the variable table
     // Not yet tho - one step at a time
 
-    write_code(context, ".data");
-    write_code(context, "_newline_char: .asciiz \"\\n\"");
-    write_code(context, "_bool_true: .asciiz \"true\"");
-    write_code(context, "_bool_false: .asciiz \"false\"");
-    write_code(context, "# Will get filled in when we add variables");
-    write_code(context, "");
-    write_code(context, ".text");
-    write_code(context, "# All the labels for functions, including main: globl makes a label accessible across the entire program");
+    context << ".data\n";
+    context << "_newline_char: .asciiz \"\\n\"\n";
+    context << "_bool_true: .asciiz \"true\"\n";
+    context << "_bool_false: .asciiz \"false\"\n";
+    context << "# Will get filled in when we add variables\n";
+    context << "\n";
+    context << ".text\n";
     main->emit_code(context);
+    context << "# All the labels for functions, including main: globl makes a label accessible across the entire program\n";
+    context << "# Also, for simplicity's sake, I will put a _print_bool function here\n";
+    context << "\n";
+    context << "# Bool is passed in $a0\n";
+    context << "_print_bool:\n";
+    context << "    # Only using registers $a0 and $v0, so I don't think we need to save registers\n";
+    context << "    beqz $a0, _print_false\n";
+    context << "    # Else, print true\n";
+    context << "    la $a0, _bool_true # Load string for false\n";
+    context << "    li $v0, 4 # Syscall for string printing\n";
+    context << "    syscall\n";
+    context << "    jr $ra # Jump back\n";
+    context << "\n";
+    context << "_print_false:\n";
+    context << "    la $a0, _bool_false # Load string for true\n";
+    context << "    li $v0, 4 # Syscall for string printing\n";
+    context << "    syscall\n";
+    context << "    jr $ra # Jump back\n";
 }
 
 MainDefNode::MainDefNode(FuncBodyNode *func_body):
@@ -99,10 +107,14 @@ MainDefNode::~MainDefNode() {
     delete func_body;
 }
 
-void MainDefNode::emit_code(AssemblyContext* context) {
-    write_code(context, "main:");
-    write_code(context, "# Now, all the statements that are part of main...");
+void MainDefNode::emit_code(std::ostream &context) {
+    context << ".globl main\n";
+    context << "main:\n";
+    context << "# Now, all the statements that are part of main...\n";
     func_body->emit_code(context);
+    context << "# Exit\n";
+    context << "li $v0, 10\n";
+    context << "syscall\n";
 }
 
 void MainDefNode::check_body(FuncSymbolTable *table) {
@@ -191,7 +203,27 @@ void FuncBodyNode::check_return_statement(FuncSymbolTable *funcs, VarSymbolTable
     }
 }
 
-void FuncBodyNode::emit_code(AssemblyContext* context) {
+void FuncBodyNode::emit_code(std::ostream &context) {
+    /* First, emit code dealing with local variables -
+        This will involve adding each to the stack, and setting each variable's stack offset
+    */
+    int current_offset = 0;
+    for (auto j = local_var_decs->map.begin(); j != local_var_decs->map.end(); j++) {
+        // Each variable has a size, and a stack offset
+        if (j->second->size % 4 != 0) {
+            std::cout << "Size of variable " << j->first << " didn't have size divisible by 4!\n";
+        }
+        context << "# Allocating space for " << j->first << ", which requires " << j->second->size << " bytes, and setting it to 0\n";
+        for (int k = 0; k < j->second->size / 4; k++) { // First is name, second is VariableInfo
+            // Frame pointer remains, stack pointer moves
+            context << "add $sp, $sp, -4\n";
+            context << "li $t0, 0\n";
+            context << "sw $t0, ($sp)\n";
+            current_offset += 4;
+        } // I'm sure this is a little unneccessary - but in the alarming case that something takes 5 bytes, it will technically be fine
+        
+        j->second->stack_offset = current_offset; // This will be 4 if it is the first variable - i.e., 4 minus what it was before
+    }
     for (int i = 0; i < statement_list->size(); i++) {
         statement_list->at(i)->emit_code(context);
     }
@@ -364,41 +396,34 @@ void PrintlnStatementNode::check_leaf_expressions(FuncSymbolTable *func_defs, Va
     }
 }
 
-void PrintlnStatementNode::emit_code(AssemblyContext *context) {
+void PrintlnStatementNode::emit_code(std::ostream &context) {
     // Emit MIPS assembly via write_code
 
-    int current_stack = context->local_stack_pointer; // Anything added to the stack by the expression node will increase the size of context, so we can find the length by just subtracting and % 4
     for (int i = 0; i < used_args->size(); i++) {
         used_args->at(i)->emit_code(context); // Pushes the expression's value onto the stack
         if (used_args->at(i)->type == RustishType::i32_t) {
             // If it is an integer...
             // Now, the expression should have added one to the current stack - and $sp now points to the value
-            write_code(context, "# Load value from the stack and print it, with a newline");
-            write_code(context, "lw $a0, ($sp)");
-            write_code(context, "addiu $sp, $sp, -4");
-            context->local_stack_pointer += 4;
-            write_code(context, "li $v0, 1");
-            write_code(context, "syscall");
+            context << "# Load value from the stack and print it, with a newline\n";
+            context << "lw $a0, ($sp)\n";
+            context << "addi $sp, $sp, 4\n";
+            context << "li $v0, 1\n";
+            context << "syscall\n";
         } else if (used_args->at(i)->type == RustishType::bool_t) {
             // If it is a bool...
             // Now, the expression should have added one to the current stack - and $sp now points to the value
-            write_code(context, "# Load value from the stack and print it, with a newline");
-            write_code(context, "lw $a0, ($sp)");
-            write_code(context, "addiu $sp, $sp, -4");
-            context->local_stack_pointer += 4;
-            write_code(context, "# Now, is it a true or false? Value is currently in $a0");
-            write_code(context, "beqz $a0, False");
-            write_code(context, "# If it doesn't branch, it is a 1: thus, print true");
-            write_code(context, "lw $a0, _bool_true");
-            write_code(context, "False: ");
-            write_code(context, "    lw $a0, _bool_false");
-            write_code(context, "li $v0, 4");
-            write_code(context, "syscall");
-        } // If it is an array, no mips code is actually put out
+            context << "# Load value from the stack and print it, with a newline\n";
+            context << "lw $a0, ($sp)\n";
+            context << "addi $sp, $sp, 4\n";
+            context << "# Now, call the _print_bool function - printing the value that is currently in $a0\n";
+            context << "# jal saves the return address automatically\n";
+            context << "jal _print_bool\n";
+            context << "\n";
+        } // If it is an array, no mips code is actually put out :/
         // And the newline
-        write_code(context, "la $a0, _newline_char");
-        write_code(context, "li $v0, 4");
-        write_code(context, "syscall");
+        context << "la $a0, _newline_char\n";
+        context << "li $v0, 4\n";
+        context << "syscall\n";
     }
 }
 
@@ -416,36 +441,33 @@ void PrintStatementNode::check_leaf_expressions(FuncSymbolTable *func_defs, VarS
     }
 }
 
-void PrintStatementNode::emit_code(AssemblyContext *context) {
+void PrintStatementNode::emit_code(std::ostream &context) {
     // Same as println, arrays may result in no mips code emitted
 
-    int current_stack = context->local_stack_pointer; // Anything added to the stack by the expression node will increase the size of context, so we can find the length by just subtracting and % 4
     for (int i = 0; i < used_args->size(); i++) {
         used_args->at(i)->emit_code(context); // Pushes the expression's value onto the stack
         if (used_args->at(i)->type == RustishType::i32_t) {
             // If it is an integer...
             // Now, the expression should have added one to the current stack - and $sp now points to the value
-            write_code(context, "# Load value from the stack and print it, with a newline");
-            write_code(context, "lw $a0, ($sp)");
-            write_code(context, "addiu $sp, $sp, -4");
-            context->local_stack_pointer += 4;
-            write_code(context, "li $v0, 4");
-            write_code(context, "syscall");
+            context << "# Load value from the stack and print it, with a newline\n";
+            context << "lw $a0, ($sp)\n";
+            context << "addi $sp, $sp, 4\n";
+            context << "li $v0, 4\n";
+            context << "syscall\n";
         } else if (used_args->at(i)->type == RustishType::bool_t) {
             // If it is a bool...
             // Now, the expression should have added one to the current stack - and $sp now points to the value
-            write_code(context, "# Load value from the stack and print it, with a newline");
-            write_code(context, "lw $a0, ($sp)");
-            write_code(context, "addiu $sp, $sp, -4");
-            context->local_stack_pointer += 4;
-            write_code(context, "# Now, is it a true or false? Value is currently in $a0");
-            write_code(context, "beqz $a0, False");
-            write_code(context, "# If it doesn't branch, it is a 1: thus, print true");
-            write_code(context, "lw $a0, _bool_true");
-            write_code(context, "False: ");
-            write_code(context, "    lw $a0, _bool_false");
-            write_code(context, "li $v0, 4");
-            write_code(context, "syscall");
+            context << "# Load value from the stack and print it, with a newline\n";
+            context << "lw $a0, ($sp)\n";
+            context << "addi $sp, $sp, 4\n";
+            context << "# Now, is it a true or false? Value is currently in $a0\n";
+            context << "beqz $a0, False\n";
+            context << "# If it doesn't branch, it is a 1: thus, print true\n";
+            context << "lw $a0, _bool_true\n";
+            context << "False: \n";
+            context << "    lw $a0, _bool_false\n";
+            context << "li $v0, 4\n";
+            context << "syscall\n";
         }
     }
 }
@@ -735,6 +757,13 @@ void FalseExpressionNode::check_expression(FuncSymbolTable *func_defs, VarSymbol
 
 RustishType FalseExpressionNode::get_type(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) {return RustishType::bool_t; };
 
+void FalseExpressionNode::emit_code(std::ostream &context) {
+    context << "# Load false\n";
+    context << "li $t0 0\n";
+    context << "add $sp, $sp, -4\n";
+    context << "sw $t0, ($sp)\n";
+}
+
 TrueExpressionNode::TrueExpressionNode(int line_num):
     line_num(line_num) { type = RustishType::bool_t; };
 
@@ -743,6 +772,13 @@ TrueExpressionNode::~TrueExpressionNode() {};
 void TrueExpressionNode::check_expression(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) {} // Nothing to do here
 
 RustishType TrueExpressionNode::get_type(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) {return RustishType::bool_t; };
+
+void TrueExpressionNode::emit_code(std::ostream &context) {
+    context << "# Load true\n";
+    context << "li $t0 0\n";
+    context << "add $sp, $sp, -4\n";
+    context << "sw $t0, ($sp)\n";
+}
 
 ReadExpressionNode::ReadExpressionNode(int line_num):
     line_num(line_num) { type = RustishType::i32_t; };
@@ -833,6 +869,9 @@ IdentifierExpressionNode::~IdentifierExpressionNode() {
 }
 
 void IdentifierExpressionNode::check_expression(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) {
+    stored_func_defs = func_defs;
+    stored_params = params;
+    stored_local_vars = local_vars; // Crappy workaround because I didn't store these initially - sorry
     VariableInfo *var = params->lookup(*identifier->identifier);
     if (var == nullptr) {
         var = local_vars->lookup(*identifier->identifier);
@@ -909,6 +948,23 @@ RustishType IdentifierExpressionNode::get_type(FuncSymbolTable *func_defs, VarSy
     return RustishType::i32_t;
 }
 
+void IdentifierExpressionNode::emit_code(std::ostream &context) {
+    // Using the stored tables, find the stack offset
+    // Then, load it into $t0 - although I'm not too sure about this one -
+    // What if you have x = a + b? If a and b are BOTH stored in $t0, -- oh wait - it can emit the code for one, then move it to $t1, and all is well - nevermind then
+    VariableInfo *var = stored_local_vars->lookup(*(identifier->identifier));
+    if (var == nullptr) {
+        var = stored_params->lookup(*(identifier->identifier));
+    }
+    if (var == nullptr) {
+        std::cout << "Compilation problem! Couldn't find the identifier " << *(identifier->identifier) << "!\n";
+        return;
+    } else {
+        std::cout << "Variable " << *(identifier->identifier) << "'s stack offset was " << var->stack_offset << "!\n";
+    }
+    context << "lw $t0, " << var->stack_offset << "($sp)\n"; // Don't have time to test tonight, may or may not work -sorry
+}
+
 NumberExpressionNode::NumberExpressionNode(NumberNode *number, int line_num):
     number(number), line_num(line_num) { type = RustishType::i32_t; };
 
@@ -924,11 +980,11 @@ RustishType NumberExpressionNode::get_type(FuncSymbolTable *func_defs, VarSymbol
     return RustishType::i32_t;
 }
 
-void NumberExpressionNode::emit_code(AssemblyContext *context) {
-    write_code(context, "li $t0 " + *(number->number));
-    write_code(context, "add $sp, $sp, -4");
-    context->local_stack_pointer -= 4;
-    write_code(context, "sw $t0, ($sp)");
+void NumberExpressionNode::emit_code(std::ostream &context) {
+    context << "# Load number\n";
+    context << "li $t0 " << *(number->number) << "\n";
+    context << "add $sp, $sp, -4\n";
+    context << "sw $t0, ($sp)\n";
 }
 
 FuncCallExpressionNode::FuncCallExpressionNode(IdentifierNode *identifier, std::vector<ExpressionNode *> *used_args, int line_num):

@@ -154,26 +154,33 @@ varDec         : identifier COLON type { // Just a variable class with an identi
                   var_info->type = $3->type;
                   var_info->initialized = false;
                   var_info->line_num = yylineno;
+                  var_info->size = type->size;
                   $$ = var_info;
                }
 
 type           : I32 {// For each of these, just make a type class with the type and maybe array size if we choose to modify this to include that in the grammar
                   $$ = new TypeNode(RustishType::i32_t); // Not entirely sure if this is the best convention??
+                  $$->size = 4;
                }
                | BOOL {
                   $$ = new TypeNode(RustishType::bool_t);
+                  $$->size = 4;
                }
                | LSQUARE I32 SEMICOLON number RSQUARE {
-                  $$ = new TypeNode(RustishType::i32array_t); // TODO: Add the length into this, otherwise typechecking isn't possible with length
+                  $$ = new TypeNode(RustishType::i32array_t); // Length of number
+                  $$->size = atoi(number->value);
                }
                | LSQUARE BOOL SEMICOLON number RSQUARE {
-                  $$ = new TypeNode(RustishType::boolarray_t);
+                  $$ = new TypeNode(RustishType::boolarray_t); // Length of number
+                  $$->size = atoi(number->value);
                }
                | LSQUARE I32 RSQUARE {
-                  $$ = new TypeNode(RustishType::i32array_t);
+                  $$ = new TypeNode(RustishType::i32array_t); // Length of 4 by default
+                  $$->size = 4;
                }
                | LSQUARE BOOL RSQUARE {
-                  $$ = new TypeNode(RustishType::boolarray_t);
+                  $$ = new TypeNode(RustishType::boolarray_t); // Length of 4 by default
+                  $$->size = 4;
                }
 
 funcBody       : LCURLY localVarDecList statementList RCURLY { 

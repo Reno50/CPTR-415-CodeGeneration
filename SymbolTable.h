@@ -22,6 +22,7 @@ typedef struct {
     int stack_offset;
     bool initialized;
     int line_num;
+    int size;
     int arr_len; // If applicable!
 } VariableInfo;
 
@@ -34,9 +35,10 @@ typedef struct {
 } FuncInfo;
 
 class VarSymbolTable {
+public:
     std::unordered_map<std::string, VariableInfo *> map;
     std::string name;
-public:
+
     VarSymbolTable(std::string name); // Constructor, create empty map and update name
 
     std::string get_name(); // Returns the name of this symbol table
@@ -51,9 +53,10 @@ public:
 };
 
 class FuncSymbolTable {
+public:
     std::unordered_map<std::string, FuncInfo *> map;
     std::string name;
-public:
+
     FuncSymbolTable(std::string name); // Constructor, create empty map and update name
 
     std::string get_name(); // Returns the name of this symbol table
