@@ -2,6 +2,7 @@
 // Code for the bison file
 // #include "lex.yy.hpp"
 #include <iostream>
+#include <fstream>
 #include <string>
 #include <vector>
 #include "ASTtree.h"
@@ -91,10 +92,8 @@ program        : funcDefList mainDef {
                   //abstract_syntax_tree = $$;
                   // No need to check functions, as all the code should be valid, but we do need to trickle up type info
                   $$->check_funcs();
-                  AssemblyContext* context = new AssemblyContext;
-                  context->output.open("test.asm", std::ios::out | std::ios::app); // Write output only and append it
-                  context->local_stack_pointer = 0;
-                  context->global_stack_pointer = 0;
+                  std::ofstream context;
+                  context.open("test.asm", std::ios::out | std::ios::app); // Write output only and append it
                   $$->emit_code(context);
 
                   std::cout << "Done!\n";
@@ -154,7 +153,7 @@ varDec         : identifier COLON type { // Just a variable class with an identi
                   var_info->type = $3->type;
                   var_info->initialized = false;
                   var_info->line_num = yylineno;
-                  var_info->size = type->size;
+                  var_info->size = $3->size;
                   $$ = var_info;
                }
 
@@ -168,11 +167,11 @@ type           : I32 {// For each of these, just make a type class with the type
                }
                | LSQUARE I32 SEMICOLON number RSQUARE {
                   $$ = new TypeNode(RustishType::i32array_t); // Length of number
-                  $$->size = atoi(number->value);
+                  $$->size = atoi(($4->number)->c_str());
                }
                | LSQUARE BOOL SEMICOLON number RSQUARE {
                   $$ = new TypeNode(RustishType::boolarray_t); // Length of number
-                  $$->size = atoi(number->value);
+                  $$->size = atoi(($4->number)->c_str());
                }
                | LSQUARE I32 RSQUARE {
                   $$ = new TypeNode(RustishType::i32array_t); // Length of 4 by default
