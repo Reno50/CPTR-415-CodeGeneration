@@ -1,5 +1,5 @@
 fn main() {
-    println(1173);
-    println(true);
-    println(false);
+    let mut x: i32;
+    x = 4;
+    println(x);
 }

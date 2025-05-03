@@ -92,6 +92,7 @@ program        : funcDefList mainDef {
                   //abstract_syntax_tree = $$;
                   // No need to check functions, as all the code should be valid, but we do need to trickle up type info
                   $$->check_funcs();
+                  std::cout << "Checked!\n";
                   std::ofstream context;
                   context.open("test.asm", std::ios::out | std::ios::app); // Write output only and append it
                   $$->emit_code(context);

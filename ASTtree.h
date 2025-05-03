@@ -35,7 +35,7 @@ enum class OtherOperators { PLUS_OP, MINUS_OP, TIMES_OP, DIV_OP, MOD_OP };
 class ASTNode {
 public:
     virtual ~ASTNode() = 0;
-    virtual void emit_code(std::ostream &context); // Emit MIPS assembly code
+    virtual void emit_code(std::ofstream &context); // Emit MIPS assembly code
 };
 
 class TypeNode: public ASTNode {
@@ -96,7 +96,7 @@ public:
     ~NumberExpressionNode() override;
     void check_expression(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) override; // Probably empty, its literally just a number
     RustishType get_type(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) override; // Just returns int, hopefully obvious
-    void emit_code(std::ostream &context) override; // Emit the MIPS code, store this number on the stack
+    void emit_code(std::ofstream &context) override; // Emit the MIPS code, store this number on the stack
 };
 
 class IdentifierExpressionNode: public ExpressionNode {
@@ -111,7 +111,7 @@ public:
     ~IdentifierExpressionNode() override;
     void check_expression(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) override; // Likely will be empty, since this is also used for declaring variables
     RustishType get_type(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) override; // Heavily relies on the symbol table
-    void emit_code(std::ostream &context) override;
+    void emit_code(std::ofstream &context) override;
 };
 
 class BinaryExpressionNode: public ExpressionNode {
@@ -143,7 +143,7 @@ public:
     ~TrueExpressionNode() override;
     void check_expression(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) override; // Also empty
     RustishType get_type(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) override; // Just bool, hopefully obvious
-    void emit_code(std::ostream &context) override;
+    void emit_code(std::ofstream &context) override;
 };
 
 class FalseExpressionNode: public ExpressionNode {
@@ -153,7 +153,7 @@ public:
     ~FalseExpressionNode() override;
     void check_expression(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) override; // Also empty
     RustishType get_type(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) override; // Again, hopefully obvious
-    void emit_code(std::ostream &context) override;
+    void emit_code(std::ofstream &context) override;
 };
 
 class NotExpressionNode: public ExpressionNode {
@@ -223,10 +223,14 @@ class AssignmentStatementNode: public StatementNode {
 public:
     IdentifierNode *identifier;
     ExpressionNode *expression;
+    FuncSymbolTable *stored_func_defs;
+    VarSymbolTable *stored_params;
+    VarSymbolTable *stored_local_vars;
 
     AssignmentStatementNode(IdentifierNode *identifier, ExpressionNode *expression);
     ~AssignmentStatementNode() override;
     void check_leaf_expressions(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) override;
+    void emit_code(std::ofstream &context) override;
 };
 
 class ArrayAssignmentStatementNode: public StatementNode {
@@ -247,7 +251,7 @@ public:
     PrintStatementNode(std::vector<ExpressionNode *> *used_args);
     ~PrintStatementNode() override;
     void check_leaf_expressions(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) override;
-    void emit_code(std::ostream &context) override;
+    void emit_code(std::ofstream &context) override;
 };
 
 class PrintlnStatementNode: public StatementNode {
@@ -256,7 +260,7 @@ public:
     PrintlnStatementNode(std::vector<ExpressionNode *> *used_args);
     ~PrintlnStatementNode() override;
     void check_leaf_expressions(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) override;
-    void emit_code(std::ostream &context) override;
+    void emit_code(std::ofstream &context) override;
 };
 
 class IfStatementNode: public StatementNode {
@@ -321,7 +325,7 @@ public:
     ~FuncBodyNode() override;
     void check_statements(FuncSymbolTable *funcs, VarSymbolTable *params);
     void check_return_statement(FuncSymbolTable *funcs, VarSymbolTable *params, std::string func);
-    void emit_code(std::ostream &context) override; // Emit MIPS for the entire function
+    void emit_code(std::ofstream &context) override; // Emit MIPS for the entire function
 };
 
 class FuncDefNode: public ASTNode {
@@ -342,7 +346,7 @@ public:
     MainDefNode(FuncBodyNode *);
     ~MainDefNode() override;
     void check_body(FuncSymbolTable *table);
-    void emit_code(std::ostream &context) override; // Emit MIPS for the main function
+    void emit_code(std::ofstream &context) override; // Emit MIPS for the main function
 };
 
 class ProgramNode: public ASTNode {
@@ -354,7 +358,7 @@ public:
     ProgramNode(MainDefNode *main, std::vector<FuncDefNode *> *func_vector); // must be a vector so we can go through and check each, but we need to pass a symbol table for convinience of lookup
     ~ProgramNode() override;
     void check_funcs(); // Check each function's validity by calling it's individual check call
-    void emit_code(std::ostream &context) override; // Emit MIPS code for the entire program
+    void emit_code(std::ofstream &context) override; // Emit MIPS code for the entire program
 };
 
 extern ProgramNode *abstract_syntax_tree;

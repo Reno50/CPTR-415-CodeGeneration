@@ -5,10 +5,21 @@
 #include <typeinfo>
 #include "ASTtree.h"
 
-void emit_var_lookup(std::ostream &context, int stack_offset, std::string reg) {
+void emit_var_lookup(std::ofstream &context, int stack_offset, std::string reg) {
     // Given the stack offset of a variable and the register to write to, emit code to put that variable in that register
     context << "# Load word at a stack offset of " << stack_offset << " into register " << reg << "\n";
-    context << "lw " << reg << ", " << stack_offset << "($sp)\n"; // I think this is right?
+    context << "lw " << reg << ", " << stack_offset << "($sp)\n";
+}
+
+void pop_top_off_stack(std::ofstream &context, std::string reg) {
+    context << "# Load top off stack into " << reg << " and decrement the stack\n";
+    context << "lw " << reg << ", ($sp)\n";
+    context << "addi $sp, $sp, 4\n";
+}
+
+void emit_var_store(std::ofstream &context, int stack_offset, std::string value_register) {
+    context << "# Store word into variable with a stack offset of " << stack_offset << "\n";
+    context << "sw " << value_register << ", " << stack_offset << "($sp)\n";
 }
 
 // In this file, I'll start from the top down, because I can and it makes it easier to have in my head
@@ -29,7 +40,7 @@ void custom_error(SemanticError *error) {
 }
 
 ASTNode::~ASTNode() {};
-void ASTNode::emit_code(std::ostream &context) {};
+void ASTNode::emit_code(std::ofstream &context) {};
 ExpressionNode::ExpressionNode() {};
 void ExpressionNode::check_expression(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) {};
 RustishType ExpressionNode::get_type(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) { return RustishType::i32_t; std::cout << "Expression node get_type shouldn't have been called...\n"; };
@@ -68,10 +79,7 @@ void ProgramNode::check_funcs() {
     main->check_body(func_table);
 }
 
-void ProgramNode::emit_code(std::ostream &context) {
-    // Normally, .data section would be full of decls from the variable table
-    // Not yet tho - one step at a time
-
+void ProgramNode::emit_code(std::ofstream &context) {
     context << ".data\n";
     context << "_newline_char: .asciiz \"\\n\"\n";
     context << "_bool_true: .asciiz \"true\"\n";
@@ -107,7 +115,7 @@ MainDefNode::~MainDefNode() {
     delete func_body;
 }
 
-void MainDefNode::emit_code(std::ostream &context) {
+void MainDefNode::emit_code(std::ofstream &context) {
     context << ".globl main\n";
     context << "main:\n";
     context << "# Now, all the statements that are part of main...\n";
@@ -203,7 +211,7 @@ void FuncBodyNode::check_return_statement(FuncSymbolTable *funcs, VarSymbolTable
     }
 }
 
-void FuncBodyNode::emit_code(std::ostream &context) {
+void FuncBodyNode::emit_code(std::ofstream &context) {
     /* First, emit code dealing with local variables -
         This will involve adding each to the stack, and setting each variable's stack offset
     */
@@ -219,7 +227,7 @@ void FuncBodyNode::emit_code(std::ostream &context) {
             context << "add $sp, $sp, -4\n";
             context << "li $t0, 0\n";
             context << "sw $t0, ($sp)\n";
-            current_offset += 4;
+            current_offset -= 4;
         } // I'm sure this is a little unneccessary - but in the alarming case that something takes 5 bytes, it will technically be fine
         
         j->second->stack_offset = current_offset; // This will be 4 if it is the first variable - i.e., 4 minus what it was before
@@ -396,13 +404,15 @@ void PrintlnStatementNode::check_leaf_expressions(FuncSymbolTable *func_defs, Va
     }
 }
 
-void PrintlnStatementNode::emit_code(std::ostream &context) {
+void PrintlnStatementNode::emit_code(std::ofstream &context) {
     // Emit MIPS assembly via write_code
 
     for (int i = 0; i < used_args->size(); i++) {
         used_args->at(i)->emit_code(context); // Pushes the expression's value onto the stack
-        if (used_args->at(i)->type == RustishType::i32_t) {
-            // If it is an integer...
+
+        // Assume an integer - needs some work, as it assumes any variable is an int
+        if (used_args->at(i)->type != RustishType::bool_t && used_args->at(i)->type != RustishType::boolarray_t && used_args->at(i)->type != RustishType::i32array_t) {
+            // If it is an integer... or a type that isn't known
             // Now, the expression should have added one to the current stack - and $sp now points to the value
             context << "# Load value from the stack and print it, with a newline\n";
             context << "lw $a0, ($sp)\n";
@@ -419,7 +429,7 @@ void PrintlnStatementNode::emit_code(std::ostream &context) {
             context << "# jal saves the return address automatically\n";
             context << "jal _print_bool\n";
             context << "\n";
-        } // If it is an array, no mips code is actually put out :/
+        }
         // And the newline
         context << "la $a0, _newline_char\n";
         context << "li $v0, 4\n";
@@ -441,7 +451,7 @@ void PrintStatementNode::check_leaf_expressions(FuncSymbolTable *func_defs, VarS
     }
 }
 
-void PrintStatementNode::emit_code(std::ostream &context) {
+void PrintStatementNode::emit_code(std::ofstream &context) {
     // Same as println, arrays may result in no mips code emitted
 
     for (int i = 0; i < used_args->size(); i++) {
@@ -469,6 +479,10 @@ void PrintStatementNode::emit_code(std::ostream &context) {
             context << "li $v0, 4\n";
             context << "syscall\n";
         }
+        context << "# Print space\n";
+        context << "li $a0, 0x20\n";
+        context << "li $v0, 11\n";
+        context << "syscall\n";
     }
 }
 
@@ -524,6 +538,9 @@ AssignmentStatementNode::~AssignmentStatementNode() {
 }
 
 void AssignmentStatementNode::check_leaf_expressions(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) {
+    stored_func_defs = func_defs;
+    stored_params = params;
+    stored_local_vars = local_vars;
     // First, check identifier
     if (params->lookup(*(identifier->identifier)) == nullptr && local_vars->lookup(*(identifier->identifier)) == nullptr) {
         SemanticError *err = new SemanticError;
@@ -555,6 +572,22 @@ void AssignmentStatementNode::check_leaf_expressions(FuncSymbolTable *func_defs,
         custom_error(err);
         delete err;
     }
+}
+
+void AssignmentStatementNode::emit_code(std::ofstream &context) {
+    // Lookup the variable's offset - find it in the tables
+    VariableInfo *var = stored_local_vars->lookup(*(identifier->identifier));
+    if (var == nullptr) {
+        var = stored_params->lookup(*(identifier->identifier));
+    }
+    // That should work because we aren't passed incorrect code in this stage
+
+    // First, emit code so the expression puts its value on the top of the stack...
+    expression->emit_code(context);
+    // Now that it is on the stack, store the value into var->stack_offset on the stack and decrement the stack (because we are done with the expression)
+    pop_top_off_stack(context, "$t1"); // t1 because emit_var_store uses t0
+    emit_var_store(context, var->stack_offset, "$t1");
+    // Done - we just stored the value in the variable
 }
 
 OtherOpStatementNode::OtherOpStatementNode(IdentifierNode *identifier, ExpressionNode *operand, OtherOperators op):
@@ -757,7 +790,7 @@ void FalseExpressionNode::check_expression(FuncSymbolTable *func_defs, VarSymbol
 
 RustishType FalseExpressionNode::get_type(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) {return RustishType::bool_t; };
 
-void FalseExpressionNode::emit_code(std::ostream &context) {
+void FalseExpressionNode::emit_code(std::ofstream &context) {
     context << "# Load false\n";
     context << "li $t0 0\n";
     context << "add $sp, $sp, -4\n";
@@ -773,7 +806,7 @@ void TrueExpressionNode::check_expression(FuncSymbolTable *func_defs, VarSymbolT
 
 RustishType TrueExpressionNode::get_type(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) {return RustishType::bool_t; };
 
-void TrueExpressionNode::emit_code(std::ostream &context) {
+void TrueExpressionNode::emit_code(std::ofstream &context) {
     context << "# Load true\n";
     context << "li $t0 0\n";
     context << "add $sp, $sp, -4\n";
@@ -948,7 +981,7 @@ RustishType IdentifierExpressionNode::get_type(FuncSymbolTable *func_defs, VarSy
     return RustishType::i32_t;
 }
 
-void IdentifierExpressionNode::emit_code(std::ostream &context) {
+void IdentifierExpressionNode::emit_code(std::ofstream &context) {
     // Using the stored tables, find the stack offset
     // Then, load it into $t0 - although I'm not too sure about this one -
     // What if you have x = a + b? If a and b are BOTH stored in $t0, -- oh wait - it can emit the code for one, then move it to $t1, and all is well - nevermind then
@@ -962,7 +995,11 @@ void IdentifierExpressionNode::emit_code(std::ostream &context) {
     } else {
         std::cout << "Variable " << *(identifier->identifier) << "'s stack offset was " << var->stack_offset << "!\n";
     }
+    context << "# Load variable " << *(identifier->identifier) << " into $t0, and put it on the stack at the end\n";
     context << "lw $t0, " << var->stack_offset << "($sp)\n"; // Don't have time to test tonight, may or may not work -sorry
+    context << "add $sp, $sp, -4\n";
+    context << "sw $t0, ($sp)\n";
+    context << "\n";
 }
 
 NumberExpressionNode::NumberExpressionNode(NumberNode *number, int line_num):
@@ -980,7 +1017,7 @@ RustishType NumberExpressionNode::get_type(FuncSymbolTable *func_defs, VarSymbol
     return RustishType::i32_t;
 }
 
-void NumberExpressionNode::emit_code(std::ostream &context) {
+void NumberExpressionNode::emit_code(std::ofstream &context) {
     context << "# Load number\n";
     context << "li $t0 " << *(number->number) << "\n";
     context << "add $sp, $sp, -4\n";
