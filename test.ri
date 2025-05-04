@@ -1,7 +1,13 @@
 fn main() {
     let mut x: i32;
     let mut y: i32;
+    let mut z: bool;
     y = 1;
     x = 4;
-    println(y + x);
+    z = false;
+    if (z) {
+        println(x);
+    } else {
+        println(y);
+    }
 }

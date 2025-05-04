@@ -271,6 +271,7 @@ public:
     IfStatementNode(ExpressionNode *condition, std::vector<StatementNode *> *statement_list);
     ~IfStatementNode() override;
     void check_leaf_expressions(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) override;
+    void emit_code(std::ofstream &context);
 };
 
 class IfElseStatementNode: public StatementNode {
@@ -281,6 +282,7 @@ public:
     IfElseStatementNode(ExpressionNode *condition, std::vector<StatementNode *> *if_statement_list, std::vector<StatementNode *> *else_statement_list);
     ~IfElseStatementNode() override;
     void check_leaf_expressions(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) override;
+    void emit_code(std::ofstream &context);
 };
 
 class WhileStatementNode: public StatementNode {
@@ -290,6 +292,7 @@ public:
     WhileStatementNode(ExpressionNode *condition, std::vector<StatementNode *> *statement_list);
     ~WhileStatementNode() override;
     void check_leaf_expressions(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) override;
+    void emit_code(std::ofstream &context);
 };
 
 class FuncCallStatementNode: public StatementNode {

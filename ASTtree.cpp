@@ -6,6 +6,33 @@
 #include "ASTtree.h"
 
 int comparison_branch_count = 0;
+int if_counter = 0;
+int loop_counter = 0;
+
+std::string bin_op_to_string(BinaryOperator op) {
+    switch (op) {
+        case BinaryOperator::LT_OP:
+            return "less than";
+            break;
+        case BinaryOperator::EQ_OP:
+            return "equal to";
+            break;
+        case BinaryOperator::LE_OP:
+            return "less than or equal to";
+            break;
+        case BinaryOperator::GE_OP:
+            return "greater than or equal to";
+            break;
+        case BinaryOperator::GT_OP:
+            return "greater than";
+            break;
+        case BinaryOperator::NE_OP:
+            return "not equal";
+            break;
+    }
+    return "";
+}
+
 
 void emit_var_lookup(std::ofstream &context, int stack_offset, std::string reg) {
     // Given the stack offset of a variable and the register to write to, emit code to put that variable in that register
@@ -73,30 +100,6 @@ std::string type_to_string(RustishType r) {
         return "i32array_t";
     }
 }
-
-std::string bin_op_to_string(BinaryOperator op) {
-    switch (op) {
-        case BinaryOperator::LT_OP:
-            return "less than";
-            break;
-        case BinaryOperator::EQ_OP:
-            return "equal to";
-            break;
-        case BinaryOperator::LE_OP:
-            return "less than or equal to";
-            break;
-        case BinaryOperator::GE_OP:
-            return "greater than or equal to";
-            break;
-        case BinaryOperator::GT_OP:
-            return "greater than";
-            break;
-        case BinaryOperator::NE_OP:
-            return "not equal";
-            break;
-    }
-}
-
 void custom_error(SemanticError *error) {
     std::cout << "(Err)";
 }
@@ -409,6 +412,28 @@ void WhileStatementNode::check_leaf_expressions(FuncSymbolTable *func_defs, VarS
     }
 }
 
+void WhileStatementNode::emit_code(std::ofstream &context) {
+    int label_id = loop_counter++; // global counter to make labels unique
+    std::string loop_start = "_loop_start_" + std::to_string(label_id);
+    std::string loop_end = "_loop_end_" + std::to_string(label_id);
+
+    context << "# Begin while loop\n";
+    context << loop_start << ":\n";
+
+    condition->emit_code(context); // pushes result onto stack
+    pop_top_off_stack(context, "$t0");
+    context << "beq $t0, $zero, " << loop_end << "\n";
+
+    // Emit body
+    for (int i = 0; i < statement_list->size(); i++) {
+        statement_list->at(i)->emit_code(context);
+    }
+
+    context << "j " << loop_start << "\n";
+    context << loop_end << ":\n";
+    context << "# End while loop\n";    
+}
+
 IfElseStatementNode::IfElseStatementNode(ExpressionNode *condition, std::vector<StatementNode *> *if_statement_list, std::vector<StatementNode *> *else_statement_list):
     condition(condition), if_statement_list(if_statement_list), else_statement_list(else_statement_list) {};
 
@@ -440,6 +465,42 @@ void IfElseStatementNode::check_leaf_expressions(FuncSymbolTable *func_defs, Var
     }
 }
 
+void IfElseStatementNode::emit_code(std::ofstream &context) {
+    int label_id = if_counter++;  // global counter for unique labels
+    std::string else_label = "_else_branch_" + std::to_string(label_id);
+    std::string end_label = "_end_if_else_" + std::to_string(label_id);
+
+    context << "# Begin if-else statement\n";
+
+    // Emit condition
+    condition->emit_code(context);   // pushes condition result to stack
+    pop_top_off_stack(context, "$t0");
+
+    // Branch to else if condition is false (i.e., $t0 == 0)
+    context << "beq $t0, $zero, " << else_label << "\n";
+
+    // Emit then body
+    context << "# Then branch\n";
+    for (int i = 0; i < if_statement_list->size(); i++) {
+        if_statement_list->at(i)->emit_code(context);
+    }
+
+    // Jump over else block
+    context << "j " << end_label << "\n";
+
+    // Else label
+    context << else_label << ":\n";
+    context << "# Else branch\n";
+    for (int j = 0; j < else_statement_list->size(); j++) {
+        else_statement_list->at(j)->emit_code(context);
+    }
+
+    // End label
+    context << end_label << ":\n";
+    context << "# End of if-else statement\n";
+}
+
+
 IfStatementNode::IfStatementNode(ExpressionNode *condition, std::vector<StatementNode *> *statement_list):
     condition(condition), statement_list(statement_list) {};
 
@@ -464,6 +525,30 @@ void IfStatementNode::check_leaf_expressions(FuncSymbolTable *func_defs, VarSymb
         custom_error(err);
         delete err;
     }
+}
+
+void IfStatementNode::emit_code(std::ofstream &context) {
+    int label_id = if_counter++;  // global counter for unique labels
+    std::string end_label = "_end_if" + std::to_string(label_id);
+
+    context << "# Begin if statement\n";
+
+    // Emit condition
+    condition->emit_code(context);   // pushes condition result to stack
+    pop_top_off_stack(context, "$t0");
+
+    // Branch to end if condition is false (i.e., $t0 == 0)
+    context << "beq $t0, $zero, " << end_label << "\n";
+
+    // Emit then body
+    context << "# Then branch\n";
+    for (int i = 0; i < statement_list->size(); i++) {
+        statement_list->at(i)->emit_code(context);
+    }
+
+    // End label
+    context << end_label << ":\n";
+    context << "# End of if-else statement\n";
 }
 
 PrintlnStatementNode::PrintlnStatementNode(std::vector<ExpressionNode *> *used_args):
@@ -991,17 +1076,17 @@ void BinaryExpressionNode::emit_code(std::ofstream &context) {
         case BinaryOperator::TIMES_OP:
             context << "# Perform multiplication into t2\n";
             context << "mult $t0, $t1\n";
-            context << "lw $t2, ($Lo)\n";
+            context << "mflo $t2\n";
             break;
         case BinaryOperator::DIV_OP:
             context << "# Perform division into t2\n";
             context << "div $t1, $t0\n";
-            context << "lw $t2, ($Lo)\n";
+            context << "mflo $t2\n";
             break;
         case BinaryOperator::MOD_OP:
             context << "# Perform modulo into t2\n";
             context << "div $t1, $t0\n";
-            context << "lw $t2, ($Lo)\n";
+            context << "mfhi $t2\n";
             break;
         case BinaryOperator::AND_OP:
             context << "# Perform and into t2\n";
@@ -1132,8 +1217,6 @@ void IdentifierExpressionNode::emit_code(std::ofstream &context) {
     if (var == nullptr) {
         std::cout << "Compilation problem! Couldn't find the identifier " << *(identifier->identifier) << "!\n";
         return;
-    } else {
-        std::cout << "Variable " << *(identifier->identifier) << "'s stack offset from $fp was " << var->stack_offset << "!\n";
     }
     context << "# Load variable " << *(identifier->identifier) << " into $t0, and put it on the stack at the end\n";
     context << "lw $t0, " << var->stack_offset << "($fp)\n";
