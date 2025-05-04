@@ -125,6 +125,7 @@ public:
     ~BinaryExpressionNode() override;
     void check_expression(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) override;
     RustishType get_type(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) override; // Definitely depends on operands
+    void emit_code(std::ofstream &context);
 };
 
 class ReadExpressionNode: public ExpressionNode {

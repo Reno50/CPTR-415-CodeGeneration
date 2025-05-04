@@ -1582,7 +1582,7 @@ yyreduce:
                   (yyval.program_node)->check_funcs();
                   std::cout << "Checked!\n";
                   std::ofstream context;
-                  context.open("test.asm", std::ios::out | std::ios::app); // Write output only and append it
+                  context.open("test.asm", std::ios::out); // Write output only and append it
                   (yyval.program_node)->emit_code(context);
 
                   std::cout << "Done!\n";

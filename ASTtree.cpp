@@ -5,10 +5,12 @@
 #include <typeinfo>
 #include "ASTtree.h"
 
+int comparison_branch_count = 0;
+
 void emit_var_lookup(std::ofstream &context, int stack_offset, std::string reg) {
     // Given the stack offset of a variable and the register to write to, emit code to put that variable in that register
-    context << "# Load word at a stack offset of " << stack_offset << " into register " << reg << "\n";
-    context << "lw " << reg << ", " << stack_offset << "($sp)\n";
+    context << "# Load word at a frame pointer offset of " << stack_offset << " into register " << reg << "\n";
+    context << "lw " << reg << ", " << stack_offset << "($fp)\n";
 }
 
 void pop_top_off_stack(std::ofstream &context, std::string reg) {
@@ -18,8 +20,45 @@ void pop_top_off_stack(std::ofstream &context, std::string reg) {
 }
 
 void emit_var_store(std::ofstream &context, int stack_offset, std::string value_register) {
-    context << "# Store word into variable with a stack offset of " << stack_offset << "\n";
-    context << "sw " << value_register << ", " << stack_offset << "($sp)\n";
+    context << "# Store word into variable with a frame pointer offset of " << stack_offset << "\n";
+    context << "sw " << value_register << ", " << stack_offset << "($fp)\n";
+}
+
+void push_val_onto_stack(std::ofstream &context, std::string reg) {
+    context << "# Store value in " << reg << " on top of the stack\n";
+    context << "add $sp, $sp, -4\n";
+    context << "sw " << reg << ", ($sp)\n";
+}
+
+void emit_comparison(std::ofstream &context, std::string result_reg, BinaryOperator op) {
+    // Haven't tested this much yet
+    std::string true_label = "cmp_true_" + std::to_string(comparison_branch_count);
+    std::string end_label = "cmp_end_" + std::to_string(comparison_branch_count);
+    comparison_branch_count++;
+
+    context << "# Perform comparison: if ($t1 " << bin_op_to_string(op) << " $t0), set " << bin_op_to_string(op) << " = 1, else 0\n";
+
+    // Emit the appropriate branch instruction
+    if (op == BinaryOperator::LT_OP)
+        context << "blt $t1, $t0, " << true_label << "\n";
+    else if (op == BinaryOperator::LE_OP)
+        context << "ble $t1, $t0, " << true_label << "\n";
+    else if (op == BinaryOperator::GT_OP)
+        context << "bgt $t1, $t0, " << true_label << "\n";
+    else if (op == BinaryOperator::GE_OP)
+        context << "bge $t1, $t0, " << true_label << "\n";
+    else if (op == BinaryOperator::EQ_OP)
+        context << "beq $t1, $t0, " << true_label << "\n";
+    else if (op == BinaryOperator::NE_OP)
+        context << "bne $t1, $t0, " << true_label << "\n";
+    
+    context << "li " << result_reg << ", 0\n";
+    context << "j " << end_label << "\n";
+
+    context << true_label << ":\n";
+    context << "li " << result_reg << ", 1\n";
+
+    context << end_label << ":\n";
 }
 
 // In this file, I'll start from the top down, because I can and it makes it easier to have in my head
@@ -32,6 +71,29 @@ std::string type_to_string(RustishType r) {
         return "boolarray_t";
     } else {
         return "i32array_t";
+    }
+}
+
+std::string bin_op_to_string(BinaryOperator op) {
+    switch (op) {
+        case BinaryOperator::LT_OP:
+            return "less than";
+            break;
+        case BinaryOperator::EQ_OP:
+            return "equal to";
+            break;
+        case BinaryOperator::LE_OP:
+            return "less than or equal to";
+            break;
+        case BinaryOperator::GE_OP:
+            return "greater than or equal to";
+            break;
+        case BinaryOperator::GT_OP:
+            return "greater than";
+            break;
+        case BinaryOperator::NE_OP:
+            return "not equal";
+            break;
     }
 }
 
@@ -87,7 +149,12 @@ void ProgramNode::emit_code(std::ofstream &context) {
     context << "# Will get filled in when we add variables\n";
     context << "\n";
     context << ".text\n";
+    context << "# Emit the main function code from program\n";
     main->emit_code(context);
+    context << "# Emit every other function code from program\n";
+    for (int i = 0; i < func_vector->size(); i++) {
+        func_vector->at(i)->emit_code(context);
+    }
     context << "# All the labels for functions, including main: globl makes a label accessible across the entire program\n";
     context << "# Also, for simplicity's sake, I will put a _print_bool function here\n";
     context << "\n";
@@ -212,7 +279,15 @@ void FuncBodyNode::check_return_statement(FuncSymbolTable *funcs, VarSymbolTable
 }
 
 void FuncBodyNode::emit_code(std::ofstream &context) {
-    /* First, emit code dealing with local variables -
+    /* First, store the frame pointer and return address onto the stack */
+    context << "# Store the old frame pointer and the return address onto the stack - then, set the new frame pointer \n";
+    context << "# To access these, do 4($fp) and 8($fp)\n";
+    context << "sw $ra, -4($sp)\n";
+    context << "sw $fp, -8($sp)\n";
+    context << "addi $fp, $sp, -8\n";
+    context << "addi $sp, $sp, -8\n";
+
+    /* Next, emit code dealing with local variables -
         This will involve adding each to the stack, and setting each variable's stack offset
     */
     int current_offset = 0;
@@ -229,7 +304,8 @@ void FuncBodyNode::emit_code(std::ofstream &context) {
             context << "sw $t0, ($sp)\n";
             current_offset -= 4;
         } // I'm sure this is a little unneccessary - but in the alarming case that something takes 5 bytes, it will technically be fine
-        
+        // This offset is from the 'top' of the stack, which is the highest address - stack grows from high to low numbers
+        std::cout << "Setting variable " << j->second->name << "'s offset to " << current_offset << "\n";
         j->second->stack_offset = current_offset; // This will be 4 if it is the first variable - i.e., 4 minus what it was before
     }
     for (int i = 0; i < statement_list->size(); i++) {
@@ -585,7 +661,7 @@ void AssignmentStatementNode::emit_code(std::ofstream &context) {
     // First, emit code so the expression puts its value on the top of the stack...
     expression->emit_code(context);
     // Now that it is on the stack, store the value into var->stack_offset on the stack and decrement the stack (because we are done with the expression)
-    pop_top_off_stack(context, "$t1"); // t1 because emit_var_store uses t0
+    pop_top_off_stack(context, "$t1"); // t1 arbitrary - used to be because $t0 is used
     emit_var_store(context, var->stack_offset, "$t1");
     // Done - we just stored the value in the variable
 }
@@ -894,6 +970,70 @@ RustishType BinaryExpressionNode::get_type(FuncSymbolTable *func_defs, VarSymbol
     }
 }
 
+void BinaryExpressionNode::emit_code(std::ofstream &context) {
+    context << "# Beginning binary operator code\n";
+    left_operand->emit_code(context);
+    right_operand->emit_code(context);
+    context << "# Now perform the operation and store the result in the stack\n";
+    context << "# Pop right operand off\n";
+    pop_top_off_stack(context, "$t0");
+    context << "# Pop left operand off\n";
+    pop_top_off_stack(context, "$t1");
+    switch (op) {
+        case BinaryOperator::PLUS_OP:
+            context << "# Perform addition into t2\n";
+            context << "add $t2, $t0, $t1\n";
+            break;
+        case BinaryOperator::MINUS_OP:
+            context << "# Perform subtraction into t2\n";
+            context << "sub $t2, $t1, $t0\n";
+            break;
+        case BinaryOperator::TIMES_OP:
+            context << "# Perform multiplication into t2\n";
+            context << "mult $t0, $t1\n";
+            context << "lw $t2, ($Lo)\n";
+            break;
+        case BinaryOperator::DIV_OP:
+            context << "# Perform division into t2\n";
+            context << "div $t1, $t0\n";
+            context << "lw $t2, ($Lo)\n";
+            break;
+        case BinaryOperator::MOD_OP:
+            context << "# Perform modulo into t2\n";
+            context << "div $t1, $t0\n";
+            context << "lw $t2, ($Lo)\n";
+            break;
+        case BinaryOperator::AND_OP:
+            context << "# Perform and into t2\n";
+            context << "and $t2, $t0, $t1\n";
+            break;
+        case BinaryOperator::OR_OP:
+            context << "# Perform or into t2\n";
+            context << "or $t2, $t0, $t1\n";
+            break;
+        case BinaryOperator::LT_OP:
+            emit_comparison(context, "$t2", BinaryOperator::LT_OP);
+            break;
+        case BinaryOperator::EQ_OP:
+            emit_comparison(context, "$t2", BinaryOperator::EQ_OP);
+            break;
+        case BinaryOperator::LE_OP:
+            emit_comparison(context, "$t2", BinaryOperator::LE_OP);
+            break;
+        case BinaryOperator::GE_OP:
+            emit_comparison(context, "$t2", BinaryOperator::GE_OP);
+            break;
+        case BinaryOperator::GT_OP:
+            emit_comparison(context, "$t2", BinaryOperator::GT_OP);
+            break;
+        case BinaryOperator::NE_OP:
+            emit_comparison(context, "$t2", BinaryOperator::NE_OP);
+            break;
+    }
+    context << "# Put result on the stack\n";
+    push_val_onto_stack(context, "$t2");
+}
+
 IdentifierExpressionNode::IdentifierExpressionNode(IdentifierNode *identifier, int line_num):
     identifier(identifier), line_num(line_num) {};
 
@@ -993,10 +1133,10 @@ void IdentifierExpressionNode::emit_code(std::ofstream &context) {
         std::cout << "Compilation problem! Couldn't find the identifier " << *(identifier->identifier) << "!\n";
         return;
     } else {
-        std::cout << "Variable " << *(identifier->identifier) << "'s stack offset was " << var->stack_offset << "!\n";
+        std::cout << "Variable " << *(identifier->identifier) << "'s stack offset from $fp was " << var->stack_offset << "!\n";
     }
     context << "# Load variable " << *(identifier->identifier) << " into $t0, and put it on the stack at the end\n";
-    context << "lw $t0, " << var->stack_offset << "($sp)\n"; // Don't have time to test tonight, may or may not work -sorry
+    context << "lw $t0, " << var->stack_offset << "($fp)\n";
     context << "add $sp, $sp, -4\n";
     context << "sw $t0, ($sp)\n";
     context << "\n";
@@ -1019,7 +1159,7 @@ RustishType NumberExpressionNode::get_type(FuncSymbolTable *func_defs, VarSymbol
 
 void NumberExpressionNode::emit_code(std::ofstream &context) {
     context << "# Load number\n";
-    context << "li $t0 " << *(number->number) << "\n";
+    context << "li $t0, " << *(number->number) << "\n";
     context << "add $sp, $sp, -4\n";
     context << "sw $t0, ($sp)\n";
 }
