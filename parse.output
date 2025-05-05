@@ -1,0 +1,2585 @@
+Terminals unused in grammar
+
+    INT_ARR
+    BOOL_ARR
+
+
+Grammar
+
+    0 $accept: program $end
+
+    1 program: funcDefList mainDef
+
+    2 funcDefList: funcDefList funcDef
+    3            | ε
+
+    4 mainDef: FN MAIN LPAREN RPAREN funcBody
+
+    5 funcDef: FN identifier LPAREN paramsList RPAREN ARROW type funcBody
+    6        | FN identifier LPAREN paramsList RPAREN funcBody
+    7        | FN identifier LPAREN RPAREN ARROW type funcBody
+    8        | FN identifier LPAREN RPAREN funcBody
+
+    9 paramsList: paramsList COMMA varDec
+   10           | varDec
+
+   11 varDec: identifier COLON type
+
+   12 type: I32
+   13     | BOOL
+   14     | LSQUARE I32 SEMICOLON number RSQUARE
+   15     | LSQUARE BOOL SEMICOLON number RSQUARE
+   16     | LSQUARE I32 RSQUARE
+   17     | LSQUARE BOOL RSQUARE
+
+   18 funcBody: LCURLY localVarDecList statementList RCURLY
+
+   19 localVarDecList: localVarDecList LET MUT varDec SEMICOLON
+   20                | ε
+
+   21 statementList: statementList statement
+   22              | ε
+
+   23 statement: SEMICOLON
+   24          | identifier ASSIGN expression SEMICOLON
+   25          | identifier PLUS ASSIGN expression SEMICOLON
+   26          | identifier MINUS ASSIGN expression SEMICOLON
+   27          | identifier TIMES ASSIGN expression SEMICOLON
+   28          | identifier DIV ASSIGN expression SEMICOLON
+   29          | identifier MOD ASSIGN expression SEMICOLON
+   30          | identifier LSQUARE expression RSQUARE ASSIGN expression SEMICOLON
+   31          | PRINT LPAREN usedArgs RPAREN SEMICOLON
+   32          | PRINTLN LPAREN usedArgs RPAREN SEMICOLON
+   33          | IF expression LCURLY statementList RCURLY
+   34          | IF expression LCURLY statementList RCURLY ELSE LCURLY statementList RCURLY
+   35          | WHILE expression LCURLY statementList RCURLY
+   36          | funcCallExp SEMICOLON
+   37          | RETURN expression SEMICOLON
+   38          | RETURN SEMICOLON
+
+   39 funcCallExp: identifier LPAREN usedArgs RPAREN
+
+   40 usedArgs: expression
+   41         | usedArgs COMMA expression
+   42         | ε
+
+   43 expression: funcCallExp
+   44           | LPAREN expression RPAREN
+   45           | identifier DOT LEN
+   46           | identifier LSQUARE expression RSQUARE
+   47           | number
+   48           | identifier
+   49           | expression PLUS expression
+   50           | expression MINUS expression
+   51           | expression TIMES expression
+   52           | expression DIV expression
+   53           | expression MOD expression
+   54           | READ LPAREN RPAREN
+   55           | FALSE
+   56           | TRUE
+   57           | expression AND expression
+   58           | expression OR expression
+   59           | expression EQ expression
+   60           | expression NE expression
+   61           | expression LE expression
+   62           | expression GE expression
+   63           | expression GT expression
+   64           | expression LT expression
+   65           | NOT expression
+   66           | MINUS expression
+
+   67 identifier: IDENTIFIER
+
+   68 number: NUMBER
+
+
+Terminals, with rules where they appear
+
+    $end (0) 0
+    error (256)
+    MAIN <token> (258) 4
+    LCURLY <token> (259) 18 33 34 35
+    RCURLY <token> (260) 18 33 34 35
+    IDENTIFIER <token> (261) 67
+    SEMICOLON <token> (262) 14 15 19 23 24 25 26 27 28 29 30 31 32 36 37 38
+    NUMBER <token> (263) 68
+    ASSIGN <token> (264) 24 25 26 27 28 29 30
+    PRINT <token> (265) 31
+    READ <token> (266) 54
+    COMMA <token> (267) 9 41
+    PRINTLN <token> (268) 32
+    ARROW <token> (269) 5 7
+    COLON <token> (270) 11
+    FN <token> (271) 4 5 6 7 8
+    I32 <token> (272) 12 14 16
+    LET <token> (273) 19
+    MUT <token> (274) 19
+    BOOL <token> (275) 13 15 17
+    FALSE <token> (276) 55
+    TRUE <token> (277) 56
+    INT_ARR <token> (278)
+    BOOL_ARR <token> (279)
+    LPAREN <token> (280) 4 5 6 7 8 31 32 39 44 54
+    RPAREN <token> (281) 4 5 6 7 8 31 32 39 44 54
+    PLUS <token> (282) 25 49
+    MINUS <token> (283) 26 50 66
+    TIMES <token> (284) 27 51
+    DIV <token> (285) 28 52
+    MOD <token> (286) 29 53
+    AND <token> (287) 57
+    OR <token> (288) 58
+    NOT <token> (289) 65
+    IF <token> (290) 33 34
+    ELSE <token> (291) 34
+    WHILE <token> (292) 35
+    RETURN <token> (293) 37 38
+    LSQUARE <token> (294) 14 15 16 17 30 46
+    RSQUARE <token> (295) 14 15 16 17 30 46
+    NE <token> (296) 60
+    EQ <token> (297) 59
+    LT <token> (298) 64
+    GT <token> (299) 63
+    LE <token> (300) 61
+    GE <token> (301) 62
+    DOT <token> (302) 45
+    LEN <token> (303) 45
+
+
+Nonterminals, with rules where they appear
+
+    $accept (49)
+        on left: 0
+    program <program_node> (50)
+        on left: 1
+        on right: 0
+    funcDefList <func_def_list_node> (51)
+        on left: 2 3
+        on right: 1 2
+    mainDef <main_def_node> (52)
+        on left: 4
+        on right: 1
+    funcDef <func_def_node> (53)
+        on left: 5 6 7 8
+        on right: 2
+    paramsList <params_list_node> (54)
+        on left: 9 10
+        on right: 5 6 9
+    varDec <var_dec_node> (55)
+        on left: 11
+        on right: 9 10 19
+    type <type_node> (56)
+        on left: 12 13 14 15 16 17
+        on right: 5 7 11
+    funcBody <func_body_node> (57)
+        on left: 18
+        on right: 4 5 6 7 8
+    localVarDecList <decl_list_node> (58)
+        on left: 19 20
+        on right: 18 19
+    statementList <statement_list_node> (59)
+        on left: 21 22
+        on right: 18 21 33 34 35
+    statement <statement_node> (60)
+        on left: 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38
+        on right: 21
+    funcCallExp <func_call_exp_node> (61)
+        on left: 39
+        on right: 36 43
+    usedArgs <used_args_node> (62)
+        on left: 40 41 42
+        on right: 31 32 39 41
+    expression <expression_node> (63)
+        on left: 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66
+        on right: 24 25 26 27 28 29 30 33 34 35 37 40 41 44 46 49 50 51 52 53 57 58 59 60 61 62 63 64 65 66
+    identifier <indentifier_node> (64)
+        on left: 67
+        on right: 5 6 7 8 11 24 25 26 27 28 29 30 39 45 46 48
+    number <number_node> (65)
+        on left: 68
+        on right: 14 15 47
+
+
+State 0
+
+    0 $accept: • program $end
+
+    $default  reduce using rule 3 (funcDefList)
+
+    program      go to state 1
+    funcDefList  go to state 2
+
+
+State 1
+
+    0 $accept: program • $end
+
+    $end  shift, and go to state 3
+
+
+State 2
+
+    1 program: funcDefList • mainDef
+    2 funcDefList: funcDefList • funcDef
+
+    FN  shift, and go to state 4
+
+    mainDef  go to state 5
+    funcDef  go to state 6
+
+
+State 3
+
+    0 $accept: program $end •
+
+    $default  accept
+
+
+State 4
+
+    4 mainDef: FN • MAIN LPAREN RPAREN funcBody
+    5 funcDef: FN • identifier LPAREN paramsList RPAREN ARROW type funcBody
+    6        | FN • identifier LPAREN paramsList RPAREN funcBody
+    7        | FN • identifier LPAREN RPAREN ARROW type funcBody
+    8        | FN • identifier LPAREN RPAREN funcBody
+
+    MAIN        shift, and go to state 7
+    IDENTIFIER  shift, and go to state 8
+
+    identifier  go to state 9
+
+
+State 5
+
+    1 program: funcDefList mainDef •
+
+    $default  reduce using rule 1 (program)
+
+
+State 6
+
+    2 funcDefList: funcDefList funcDef •
+
+    $default  reduce using rule 2 (funcDefList)
+
+
+State 7
+
+    4 mainDef: FN MAIN • LPAREN RPAREN funcBody
+
+    LPAREN  shift, and go to state 10
+
+
+State 8
+
+   67 identifier: IDENTIFIER •
+
+    $default  reduce using rule 67 (identifier)
+
+
+State 9
+
+    5 funcDef: FN identifier • LPAREN paramsList RPAREN ARROW type funcBody
+    6        | FN identifier • LPAREN paramsList RPAREN funcBody
+    7        | FN identifier • LPAREN RPAREN ARROW type funcBody
+    8        | FN identifier • LPAREN RPAREN funcBody
+
+    LPAREN  shift, and go to state 11
+
+
+State 10
+
+    4 mainDef: FN MAIN LPAREN • RPAREN funcBody
+
+    RPAREN  shift, and go to state 12
+
+
+State 11
+
+    5 funcDef: FN identifier LPAREN • paramsList RPAREN ARROW type funcBody
+    6        | FN identifier LPAREN • paramsList RPAREN funcBody
+    7        | FN identifier LPAREN • RPAREN ARROW type funcBody
+    8        | FN identifier LPAREN • RPAREN funcBody
+
+    IDENTIFIER  shift, and go to state 8
+    RPAREN      shift, and go to state 13
+
+    paramsList  go to state 14
+    varDec      go to state 15
+    identifier  go to state 16
+
+
+State 12
+
+    4 mainDef: FN MAIN LPAREN RPAREN • funcBody
+
+    LCURLY  shift, and go to state 17
+
+    funcBody  go to state 18
+
+
+State 13
+
+    7 funcDef: FN identifier LPAREN RPAREN • ARROW type funcBody
+    8        | FN identifier LPAREN RPAREN • funcBody
+
+    LCURLY  shift, and go to state 17
+    ARROW   shift, and go to state 19
+
+    funcBody  go to state 20
+
+
+State 14
+
+    5 funcDef: FN identifier LPAREN paramsList • RPAREN ARROW type funcBody
+    6        | FN identifier LPAREN paramsList • RPAREN funcBody
+    9 paramsList: paramsList • COMMA varDec
+
+    COMMA   shift, and go to state 21
+    RPAREN  shift, and go to state 22
+
+
+State 15
+
+   10 paramsList: varDec •
+
+    $default  reduce using rule 10 (paramsList)
+
+
+State 16
+
+   11 varDec: identifier • COLON type
+
+    COLON  shift, and go to state 23
+
+
+State 17
+
+   18 funcBody: LCURLY • localVarDecList statementList RCURLY
+
+    $default  reduce using rule 20 (localVarDecList)
+
+    localVarDecList  go to state 24
+
+
+State 18
+
+    4 mainDef: FN MAIN LPAREN RPAREN funcBody •
+
+    $default  reduce using rule 4 (mainDef)
+
+
+State 19
+
+    7 funcDef: FN identifier LPAREN RPAREN ARROW • type funcBody
+
+    I32      shift, and go to state 25
+    BOOL     shift, and go to state 26
+    LSQUARE  shift, and go to state 27
+
+    type  go to state 28
+
+
+State 20
+
+    8 funcDef: FN identifier LPAREN RPAREN funcBody •
+
+    $default  reduce using rule 8 (funcDef)
+
+
+State 21
+
+    9 paramsList: paramsList COMMA • varDec
+
+    IDENTIFIER  shift, and go to state 8
+
+    varDec      go to state 29
+    identifier  go to state 16
+
+
+State 22
+
+    5 funcDef: FN identifier LPAREN paramsList RPAREN • ARROW type funcBody
+    6        | FN identifier LPAREN paramsList RPAREN • funcBody
+
+    LCURLY  shift, and go to state 17
+    ARROW   shift, and go to state 30
+
+    funcBody  go to state 31
+
+
+State 23
+
+   11 varDec: identifier COLON • type
+
+    I32      shift, and go to state 25
+    BOOL     shift, and go to state 26
+    LSQUARE  shift, and go to state 27
+
+    type  go to state 32
+
+
+State 24
+
+   18 funcBody: LCURLY localVarDecList • statementList RCURLY
+   19 localVarDecList: localVarDecList • LET MUT varDec SEMICOLON
+
+    LET  shift, and go to state 33
+
+    $default  reduce using rule 22 (statementList)
+
+    statementList  go to state 34
+
+
+State 25
+
+   12 type: I32 •
+
+    $default  reduce using rule 12 (type)
+
+
+State 26
+
+   13 type: BOOL •
+
+    $default  reduce using rule 13 (type)
+
+
+State 27
+
+   14 type: LSQUARE • I32 SEMICOLON number RSQUARE
+   15     | LSQUARE • BOOL SEMICOLON number RSQUARE
+   16     | LSQUARE • I32 RSQUARE
+   17     | LSQUARE • BOOL RSQUARE
+
+    I32   shift, and go to state 35
+    BOOL  shift, and go to state 36
+
+
+State 28
+
+    7 funcDef: FN identifier LPAREN RPAREN ARROW type • funcBody
+
+    LCURLY  shift, and go to state 17
+
+    funcBody  go to state 37
+
+
+State 29
+
+    9 paramsList: paramsList COMMA varDec •
+
+    $default  reduce using rule 9 (paramsList)
+
+
+State 30
+
+    5 funcDef: FN identifier LPAREN paramsList RPAREN ARROW • type funcBody
+
+    I32      shift, and go to state 25
+    BOOL     shift, and go to state 26
+    LSQUARE  shift, and go to state 27
+
+    type  go to state 38
+
+
+State 31
+
+    6 funcDef: FN identifier LPAREN paramsList RPAREN funcBody •
+
+    $default  reduce using rule 6 (funcDef)
+
+
+State 32
+
+   11 varDec: identifier COLON type •
+
+    $default  reduce using rule 11 (varDec)
+
+
+State 33
+
+   19 localVarDecList: localVarDecList LET • MUT varDec SEMICOLON
+
+    MUT  shift, and go to state 39
+
+
+State 34
+
+   18 funcBody: LCURLY localVarDecList statementList • RCURLY
+   21 statementList: statementList • statement
+
+    RCURLY      shift, and go to state 40
+    IDENTIFIER  shift, and go to state 8
+    SEMICOLON   shift, and go to state 41
+    PRINT       shift, and go to state 42
+    PRINTLN     shift, and go to state 43
+    IF          shift, and go to state 44
+    WHILE       shift, and go to state 45
+    RETURN      shift, and go to state 46
+
+    statement    go to state 47
+    funcCallExp  go to state 48
+    identifier   go to state 49
+
+
+State 35
+
+   14 type: LSQUARE I32 • SEMICOLON number RSQUARE
+   16     | LSQUARE I32 • RSQUARE
+
+    SEMICOLON  shift, and go to state 50
+    RSQUARE    shift, and go to state 51
+
+
+State 36
+
+   15 type: LSQUARE BOOL • SEMICOLON number RSQUARE
+   17     | LSQUARE BOOL • RSQUARE
+
+    SEMICOLON  shift, and go to state 52
+    RSQUARE    shift, and go to state 53
+
+
+State 37
+
+    7 funcDef: FN identifier LPAREN RPAREN ARROW type funcBody •
+
+    $default  reduce using rule 7 (funcDef)
+
+
+State 38
+
+    5 funcDef: FN identifier LPAREN paramsList RPAREN ARROW type • funcBody
+
+    LCURLY  shift, and go to state 17
+
+    funcBody  go to state 54
+
+
+State 39
+
+   19 localVarDecList: localVarDecList LET MUT • varDec SEMICOLON
+
+    IDENTIFIER  shift, and go to state 8
+
+    varDec      go to state 55
+    identifier  go to state 16
+
+
+State 40
+
+   18 funcBody: LCURLY localVarDecList statementList RCURLY •
+
+    $default  reduce using rule 18 (funcBody)
+
+
+State 41
+
+   23 statement: SEMICOLON •
+
+    $default  reduce using rule 23 (statement)
+
+
+State 42
+
+   31 statement: PRINT • LPAREN usedArgs RPAREN SEMICOLON
+
+    LPAREN  shift, and go to state 56
+
+
+State 43
+
+   32 statement: PRINTLN • LPAREN usedArgs RPAREN SEMICOLON
+
+    LPAREN  shift, and go to state 57
+
+
+State 44
+
+   33 statement: IF • expression LCURLY statementList RCURLY
+   34          | IF • expression LCURLY statementList RCURLY ELSE LCURLY statementList RCURLY
+
+    IDENTIFIER  shift, and go to state 8
+    NUMBER      shift, and go to state 58
+    READ        shift, and go to state 59
+    FALSE       shift, and go to state 60
+    TRUE        shift, and go to state 61
+    LPAREN      shift, and go to state 62
+    MINUS       shift, and go to state 63
+    NOT         shift, and go to state 64
+
+    funcCallExp  go to state 65
+    expression   go to state 66
+    identifier   go to state 67
+    number       go to state 68
+
+
+State 45
+
+   35 statement: WHILE • expression LCURLY statementList RCURLY
+
+    IDENTIFIER  shift, and go to state 8
+    NUMBER      shift, and go to state 58
+    READ        shift, and go to state 59
+    FALSE       shift, and go to state 60
+    TRUE        shift, and go to state 61
+    LPAREN      shift, and go to state 62
+    MINUS       shift, and go to state 63
+    NOT         shift, and go to state 64
+
+    funcCallExp  go to state 65
+    expression   go to state 69
+    identifier   go to state 67
+    number       go to state 68
+
+
+State 46
+
+   37 statement: RETURN • expression SEMICOLON
+   38          | RETURN • SEMICOLON
+
+    IDENTIFIER  shift, and go to state 8
+    SEMICOLON   shift, and go to state 70
+    NUMBER      shift, and go to state 58
+    READ        shift, and go to state 59
+    FALSE       shift, and go to state 60
+    TRUE        shift, and go to state 61
+    LPAREN      shift, and go to state 62
+    MINUS       shift, and go to state 63
+    NOT         shift, and go to state 64
+
+    funcCallExp  go to state 65
+    expression   go to state 71
+    identifier   go to state 67
+    number       go to state 68
+
+
+State 47
+
+   21 statementList: statementList statement •
+
+    $default  reduce using rule 21 (statementList)
+
+
+State 48
+
+   36 statement: funcCallExp • SEMICOLON
+
+    SEMICOLON  shift, and go to state 72
+
+
+State 49
+
+   24 statement: identifier • ASSIGN expression SEMICOLON
+   25          | identifier • PLUS ASSIGN expression SEMICOLON
+   26          | identifier • MINUS ASSIGN expression SEMICOLON
+   27          | identifier • TIMES ASSIGN expression SEMICOLON
+   28          | identifier • DIV ASSIGN expression SEMICOLON
+   29          | identifier • MOD ASSIGN expression SEMICOLON
+   30          | identifier • LSQUARE expression RSQUARE ASSIGN expression SEMICOLON
+   39 funcCallExp: identifier • LPAREN usedArgs RPAREN
+
+    ASSIGN   shift, and go to state 73
+    LPAREN   shift, and go to state 74
+    PLUS     shift, and go to state 75
+    MINUS    shift, and go to state 76
+    TIMES    shift, and go to state 77
+    DIV      shift, and go to state 78
+    MOD      shift, and go to state 79
+    LSQUARE  shift, and go to state 80
+
+
+State 50
+
+   14 type: LSQUARE I32 SEMICOLON • number RSQUARE
+
+    NUMBER  shift, and go to state 58
+
+    number  go to state 81
+
+
+State 51
+
+   16 type: LSQUARE I32 RSQUARE •
+
+    $default  reduce using rule 16 (type)
+
+
+State 52
+
+   15 type: LSQUARE BOOL SEMICOLON • number RSQUARE
+
+    NUMBER  shift, and go to state 58
+
+    number  go to state 82
+
+
+State 53
+
+   17 type: LSQUARE BOOL RSQUARE •
+
+    $default  reduce using rule 17 (type)
+
+
+State 54
+
+    5 funcDef: FN identifier LPAREN paramsList RPAREN ARROW type funcBody •
+
+    $default  reduce using rule 5 (funcDef)
+
+
+State 55
+
+   19 localVarDecList: localVarDecList LET MUT varDec • SEMICOLON
+
+    SEMICOLON  shift, and go to state 83
+
+
+State 56
+
+   31 statement: PRINT LPAREN • usedArgs RPAREN SEMICOLON
+
+    IDENTIFIER  shift, and go to state 8
+    NUMBER      shift, and go to state 58
+    READ        shift, and go to state 59
+    FALSE       shift, and go to state 60
+    TRUE        shift, and go to state 61
+    LPAREN      shift, and go to state 62
+    MINUS       shift, and go to state 63
+    NOT         shift, and go to state 64
+
+    $default  reduce using rule 42 (usedArgs)
+
+    funcCallExp  go to state 65
+    usedArgs     go to state 84
+    expression   go to state 85
+    identifier   go to state 67
+    number       go to state 68
+
+
+State 57
+
+   32 statement: PRINTLN LPAREN • usedArgs RPAREN SEMICOLON
+
+    IDENTIFIER  shift, and go to state 8
+    NUMBER      shift, and go to state 58
+    READ        shift, and go to state 59
+    FALSE       shift, and go to state 60
+    TRUE        shift, and go to state 61
+    LPAREN      shift, and go to state 62
+    MINUS       shift, and go to state 63
+    NOT         shift, and go to state 64
+
+    $default  reduce using rule 42 (usedArgs)
+
+    funcCallExp  go to state 65
+    usedArgs     go to state 86
+    expression   go to state 85
+    identifier   go to state 67
+    number       go to state 68
+
+
+State 58
+
+   68 number: NUMBER •
+
+    $default  reduce using rule 68 (number)
+
+
+State 59
+
+   54 expression: READ • LPAREN RPAREN
+
+    LPAREN  shift, and go to state 87
+
+
+State 60
+
+   55 expression: FALSE •
+
+    $default  reduce using rule 55 (expression)
+
+
+State 61
+
+   56 expression: TRUE •
+
+    $default  reduce using rule 56 (expression)
+
+
+State 62
+
+   44 expression: LPAREN • expression RPAREN
+
+    IDENTIFIER  shift, and go to state 8
+    NUMBER      shift, and go to state 58
+    READ        shift, and go to state 59
+    FALSE       shift, and go to state 60
+    TRUE        shift, and go to state 61
+    LPAREN      shift, and go to state 62
+    MINUS       shift, and go to state 63
+    NOT         shift, and go to state 64
+
+    funcCallExp  go to state 65
+    expression   go to state 88
+    identifier   go to state 67
+    number       go to state 68
+
+
+State 63
+
+   66 expression: MINUS • expression
+
+    IDENTIFIER  shift, and go to state 8
+    NUMBER      shift, and go to state 58
+    READ        shift, and go to state 59
+    FALSE       shift, and go to state 60
+    TRUE        shift, and go to state 61
+    LPAREN      shift, and go to state 62
+    MINUS       shift, and go to state 63
+    NOT         shift, and go to state 64
+
+    funcCallExp  go to state 65
+    expression   go to state 89
+    identifier   go to state 67
+    number       go to state 68
+
+
+State 64
+
+   65 expression: NOT • expression
+
+    IDENTIFIER  shift, and go to state 8
+    NUMBER      shift, and go to state 58
+    READ        shift, and go to state 59
+    FALSE       shift, and go to state 60
+    TRUE        shift, and go to state 61
+    LPAREN      shift, and go to state 62
+    MINUS       shift, and go to state 63
+    NOT         shift, and go to state 64
+
+    funcCallExp  go to state 65
+    expression   go to state 90
+    identifier   go to state 67
+    number       go to state 68
+
+
+State 65
+
+   43 expression: funcCallExp •
+
+    $default  reduce using rule 43 (expression)
+
+
+State 66
+
+   33 statement: IF expression • LCURLY statementList RCURLY
+   34          | IF expression • LCURLY statementList RCURLY ELSE LCURLY statementList RCURLY
+   49 expression: expression • PLUS expression
+   50           | expression • MINUS expression
+   51           | expression • TIMES expression
+   52           | expression • DIV expression
+   53           | expression • MOD expression
+   57           | expression • AND expression
+   58           | expression • OR expression
+   59           | expression • EQ expression
+   60           | expression • NE expression
+   61           | expression • LE expression
+   62           | expression • GE expression
+   63           | expression • GT expression
+   64           | expression • LT expression
+
+    LCURLY  shift, and go to state 91
+    PLUS    shift, and go to state 92
+    MINUS   shift, and go to state 93
+    TIMES   shift, and go to state 94
+    DIV     shift, and go to state 95
+    MOD     shift, and go to state 96
+    AND     shift, and go to state 97
+    OR      shift, and go to state 98
+    NE      shift, and go to state 99
+    EQ      shift, and go to state 100
+    LT      shift, and go to state 101
+    GT      shift, and go to state 102
+    LE      shift, and go to state 103
+    GE      shift, and go to state 104
+
+
+State 67
+
+   39 funcCallExp: identifier • LPAREN usedArgs RPAREN
+   45 expression: identifier • DOT LEN
+   46           | identifier • LSQUARE expression RSQUARE
+   48           | identifier •
+
+    LPAREN   shift, and go to state 74
+    LSQUARE  shift, and go to state 105
+    DOT      shift, and go to state 106
+
+    $default  reduce using rule 48 (expression)
+
+
+State 68
+
+   47 expression: number •
+
+    $default  reduce using rule 47 (expression)
+
+
+State 69
+
+   35 statement: WHILE expression • LCURLY statementList RCURLY
+   49 expression: expression • PLUS expression
+   50           | expression • MINUS expression
+   51           | expression • TIMES expression
+   52           | expression • DIV expression
+   53           | expression • MOD expression
+   57           | expression • AND expression
+   58           | expression • OR expression
+   59           | expression • EQ expression
+   60           | expression • NE expression
+   61           | expression • LE expression
+   62           | expression • GE expression
+   63           | expression • GT expression
+   64           | expression • LT expression
+
+    LCURLY  shift, and go to state 107
+    PLUS    shift, and go to state 92
+    MINUS   shift, and go to state 93
+    TIMES   shift, and go to state 94
+    DIV     shift, and go to state 95
+    MOD     shift, and go to state 96
+    AND     shift, and go to state 97
+    OR      shift, and go to state 98
+    NE      shift, and go to state 99
+    EQ      shift, and go to state 100
+    LT      shift, and go to state 101
+    GT      shift, and go to state 102
+    LE      shift, and go to state 103
+    GE      shift, and go to state 104
+
+
+State 70
+
+   38 statement: RETURN SEMICOLON •
+
+    $default  reduce using rule 38 (statement)
+
+
+State 71
+
+   37 statement: RETURN expression • SEMICOLON
+   49 expression: expression • PLUS expression
+   50           | expression • MINUS expression
+   51           | expression • TIMES expression
+   52           | expression • DIV expression
+   53           | expression • MOD expression
+   57           | expression • AND expression
+   58           | expression • OR expression
+   59           | expression • EQ expression
+   60           | expression • NE expression
+   61           | expression • LE expression
+   62           | expression • GE expression
+   63           | expression • GT expression
+   64           | expression • LT expression
+
+    SEMICOLON  shift, and go to state 108
+    PLUS       shift, and go to state 92
+    MINUS      shift, and go to state 93
+    TIMES      shift, and go to state 94
+    DIV        shift, and go to state 95
+    MOD        shift, and go to state 96
+    AND        shift, and go to state 97
+    OR         shift, and go to state 98
+    NE         shift, and go to state 99
+    EQ         shift, and go to state 100
+    LT         shift, and go to state 101
+    GT         shift, and go to state 102
+    LE         shift, and go to state 103
+    GE         shift, and go to state 104
+
+
+State 72
+
+   36 statement: funcCallExp SEMICOLON •
+
+    $default  reduce using rule 36 (statement)
+
+
+State 73
+
+   24 statement: identifier ASSIGN • expression SEMICOLON
+
+    IDENTIFIER  shift, and go to state 8
+    NUMBER      shift, and go to state 58
+    READ        shift, and go to state 59
+    FALSE       shift, and go to state 60
+    TRUE        shift, and go to state 61
+    LPAREN      shift, and go to state 62
+    MINUS       shift, and go to state 63
+    NOT         shift, and go to state 64
+
+    funcCallExp  go to state 65
+    expression   go to state 109
+    identifier   go to state 67
+    number       go to state 68
+
+
+State 74
+
+   39 funcCallExp: identifier LPAREN • usedArgs RPAREN
+
+    IDENTIFIER  shift, and go to state 8
+    NUMBER      shift, and go to state 58
+    READ        shift, and go to state 59
+    FALSE       shift, and go to state 60
+    TRUE        shift, and go to state 61
+    LPAREN      shift, and go to state 62
+    MINUS       shift, and go to state 63
+    NOT         shift, and go to state 64
+
+    $default  reduce using rule 42 (usedArgs)
+
+    funcCallExp  go to state 65
+    usedArgs     go to state 110
+    expression   go to state 85
+    identifier   go to state 67
+    number       go to state 68
+
+
+State 75
+
+   25 statement: identifier PLUS • ASSIGN expression SEMICOLON
+
+    ASSIGN  shift, and go to state 111
+
+
+State 76
+
+   26 statement: identifier MINUS • ASSIGN expression SEMICOLON
+
+    ASSIGN  shift, and go to state 112
+
+
+State 77
+
+   27 statement: identifier TIMES • ASSIGN expression SEMICOLON
+
+    ASSIGN  shift, and go to state 113
+
+
+State 78
+
+   28 statement: identifier DIV • ASSIGN expression SEMICOLON
+
+    ASSIGN  shift, and go to state 114
+
+
+State 79
+
+   29 statement: identifier MOD • ASSIGN expression SEMICOLON
+
+    ASSIGN  shift, and go to state 115
+
+
+State 80
+
+   30 statement: identifier LSQUARE • expression RSQUARE ASSIGN expression SEMICOLON
+
+    IDENTIFIER  shift, and go to state 8
+    NUMBER      shift, and go to state 58
+    READ        shift, and go to state 59
+    FALSE       shift, and go to state 60
+    TRUE        shift, and go to state 61
+    LPAREN      shift, and go to state 62
+    MINUS       shift, and go to state 63
+    NOT         shift, and go to state 64
+
+    funcCallExp  go to state 65
+    expression   go to state 116
+    identifier   go to state 67
+    number       go to state 68
+
+
+State 81
+
+   14 type: LSQUARE I32 SEMICOLON number • RSQUARE
+
+    RSQUARE  shift, and go to state 117
+
+
+State 82
+
+   15 type: LSQUARE BOOL SEMICOLON number • RSQUARE
+
+    RSQUARE  shift, and go to state 118
+
+
+State 83
+
+   19 localVarDecList: localVarDecList LET MUT varDec SEMICOLON •
+
+    $default  reduce using rule 19 (localVarDecList)
+
+
+State 84
+
+   31 statement: PRINT LPAREN usedArgs • RPAREN SEMICOLON
+   41 usedArgs: usedArgs • COMMA expression
+
+    COMMA   shift, and go to state 119
+    RPAREN  shift, and go to state 120
+
+
+State 85
+
+   40 usedArgs: expression •
+   49 expression: expression • PLUS expression
+   50           | expression • MINUS expression
+   51           | expression • TIMES expression
+   52           | expression • DIV expression
+   53           | expression • MOD expression
+   57           | expression • AND expression
+   58           | expression • OR expression
+   59           | expression • EQ expression
+   60           | expression • NE expression
+   61           | expression • LE expression
+   62           | expression • GE expression
+   63           | expression • GT expression
+   64           | expression • LT expression
+
+    PLUS   shift, and go to state 92
+    MINUS  shift, and go to state 93
+    TIMES  shift, and go to state 94
+    DIV    shift, and go to state 95
+    MOD    shift, and go to state 96
+    AND    shift, and go to state 97
+    OR     shift, and go to state 98
+    NE     shift, and go to state 99
+    EQ     shift, and go to state 100
+    LT     shift, and go to state 101
+    GT     shift, and go to state 102
+    LE     shift, and go to state 103
+    GE     shift, and go to state 104
+
+    $default  reduce using rule 40 (usedArgs)
+
+
+State 86
+
+   32 statement: PRINTLN LPAREN usedArgs • RPAREN SEMICOLON
+   41 usedArgs: usedArgs • COMMA expression
+
+    COMMA   shift, and go to state 119
+    RPAREN  shift, and go to state 121
+
+
+State 87
+
+   54 expression: READ LPAREN • RPAREN
+
+    RPAREN  shift, and go to state 122
+
+
+State 88
+
+   44 expression: LPAREN expression • RPAREN
+   49           | expression • PLUS expression
+   50           | expression • MINUS expression
+   51           | expression • TIMES expression
+   52           | expression • DIV expression
+   53           | expression • MOD expression
+   57           | expression • AND expression
+   58           | expression • OR expression
+   59           | expression • EQ expression
+   60           | expression • NE expression
+   61           | expression • LE expression
+   62           | expression • GE expression
+   63           | expression • GT expression
+   64           | expression • LT expression
+
+    RPAREN  shift, and go to state 123
+    PLUS    shift, and go to state 92
+    MINUS   shift, and go to state 93
+    TIMES   shift, and go to state 94
+    DIV     shift, and go to state 95
+    MOD     shift, and go to state 96
+    AND     shift, and go to state 97
+    OR      shift, and go to state 98
+    NE      shift, and go to state 99
+    EQ      shift, and go to state 100
+    LT      shift, and go to state 101
+    GT      shift, and go to state 102
+    LE      shift, and go to state 103
+    GE      shift, and go to state 104
+
+
+State 89
+
+   49 expression: expression • PLUS expression
+   50           | expression • MINUS expression
+   51           | expression • TIMES expression
+   52           | expression • DIV expression
+   53           | expression • MOD expression
+   57           | expression • AND expression
+   58           | expression • OR expression
+   59           | expression • EQ expression
+   60           | expression • NE expression
+   61           | expression • LE expression
+   62           | expression • GE expression
+   63           | expression • GT expression
+   64           | expression • LT expression
+   66           | MINUS expression •
+
+    TIMES  shift, and go to state 94
+    DIV    shift, and go to state 95
+    MOD    shift, and go to state 96
+    AND    shift, and go to state 97
+
+    $default  reduce using rule 66 (expression)
+
+
+State 90
+
+   49 expression: expression • PLUS expression
+   50           | expression • MINUS expression
+   51           | expression • TIMES expression
+   52           | expression • DIV expression
+   53           | expression • MOD expression
+   57           | expression • AND expression
+   58           | expression • OR expression
+   59           | expression • EQ expression
+   60           | expression • NE expression
+   61           | expression • LE expression
+   62           | expression • GE expression
+   63           | expression • GT expression
+   64           | expression • LT expression
+   65           | NOT expression •
+
+    $default  reduce using rule 65 (expression)
+
+
+State 91
+
+   33 statement: IF expression LCURLY • statementList RCURLY
+   34          | IF expression LCURLY • statementList RCURLY ELSE LCURLY statementList RCURLY
+
+    $default  reduce using rule 22 (statementList)
+
+    statementList  go to state 124
+
+
+State 92
+
+   49 expression: expression PLUS • expression
+
+    IDENTIFIER  shift, and go to state 8
+    NUMBER      shift, and go to state 58
+    READ        shift, and go to state 59
+    FALSE       shift, and go to state 60
+    TRUE        shift, and go to state 61
+    LPAREN      shift, and go to state 62
+    MINUS       shift, and go to state 63
+    NOT         shift, and go to state 64
+
+    funcCallExp  go to state 65
+    expression   go to state 125
+    identifier   go to state 67
+    number       go to state 68
+
+
+State 93
+
+   50 expression: expression MINUS • expression
+
+    IDENTIFIER  shift, and go to state 8
+    NUMBER      shift, and go to state 58
+    READ        shift, and go to state 59
+    FALSE       shift, and go to state 60
+    TRUE        shift, and go to state 61
+    LPAREN      shift, and go to state 62
+    MINUS       shift, and go to state 63
+    NOT         shift, and go to state 64
+
+    funcCallExp  go to state 65
+    expression   go to state 126
+    identifier   go to state 67
+    number       go to state 68
+
+
+State 94
+
+   51 expression: expression TIMES • expression
+
+    IDENTIFIER  shift, and go to state 8
+    NUMBER      shift, and go to state 58
+    READ        shift, and go to state 59
+    FALSE       shift, and go to state 60
+    TRUE        shift, and go to state 61
+    LPAREN      shift, and go to state 62
+    MINUS       shift, and go to state 63
+    NOT         shift, and go to state 64
+
+    funcCallExp  go to state 65
+    expression   go to state 127
+    identifier   go to state 67
+    number       go to state 68
+
+
+State 95
+
+   52 expression: expression DIV • expression
+
+    IDENTIFIER  shift, and go to state 8
+    NUMBER      shift, and go to state 58
+    READ        shift, and go to state 59
+    FALSE       shift, and go to state 60
+    TRUE        shift, and go to state 61
+    LPAREN      shift, and go to state 62
+    MINUS       shift, and go to state 63
+    NOT         shift, and go to state 64
+
+    funcCallExp  go to state 65
+    expression   go to state 128
+    identifier   go to state 67
+    number       go to state 68
+
+
+State 96
+
+   53 expression: expression MOD • expression
+
+    IDENTIFIER  shift, and go to state 8
+    NUMBER      shift, and go to state 58
+    READ        shift, and go to state 59
+    FALSE       shift, and go to state 60
+    TRUE        shift, and go to state 61
+    LPAREN      shift, and go to state 62
+    MINUS       shift, and go to state 63
+    NOT         shift, and go to state 64
+
+    funcCallExp  go to state 65
+    expression   go to state 129
+    identifier   go to state 67
+    number       go to state 68
+
+
+State 97
+
+   57 expression: expression AND • expression
+
+    IDENTIFIER  shift, and go to state 8
+    NUMBER      shift, and go to state 58
+    READ        shift, and go to state 59
+    FALSE       shift, and go to state 60
+    TRUE        shift, and go to state 61
+    LPAREN      shift, and go to state 62
+    MINUS       shift, and go to state 63
+    NOT         shift, and go to state 64
+
+    funcCallExp  go to state 65
+    expression   go to state 130
+    identifier   go to state 67
+    number       go to state 68
+
+
+State 98
+
+   58 expression: expression OR • expression
+
+    IDENTIFIER  shift, and go to state 8
+    NUMBER      shift, and go to state 58
+    READ        shift, and go to state 59
+    FALSE       shift, and go to state 60
+    TRUE        shift, and go to state 61
+    LPAREN      shift, and go to state 62
+    MINUS       shift, and go to state 63
+    NOT         shift, and go to state 64
+
+    funcCallExp  go to state 65
+    expression   go to state 131
+    identifier   go to state 67
+    number       go to state 68
+
+
+State 99
+
+   60 expression: expression NE • expression
+
+    IDENTIFIER  shift, and go to state 8
+    NUMBER      shift, and go to state 58
+    READ        shift, and go to state 59
+    FALSE       shift, and go to state 60
+    TRUE        shift, and go to state 61
+    LPAREN      shift, and go to state 62
+    MINUS       shift, and go to state 63
+    NOT         shift, and go to state 64
+
+    funcCallExp  go to state 65
+    expression   go to state 132
+    identifier   go to state 67
+    number       go to state 68
+
+
+State 100
+
+   59 expression: expression EQ • expression
+
+    IDENTIFIER  shift, and go to state 8
+    NUMBER      shift, and go to state 58
+    READ        shift, and go to state 59
+    FALSE       shift, and go to state 60
+    TRUE        shift, and go to state 61
+    LPAREN      shift, and go to state 62
+    MINUS       shift, and go to state 63
+    NOT         shift, and go to state 64
+
+    funcCallExp  go to state 65
+    expression   go to state 133
+    identifier   go to state 67
+    number       go to state 68
+
+
+State 101
+
+   64 expression: expression LT • expression
+
+    IDENTIFIER  shift, and go to state 8
+    NUMBER      shift, and go to state 58
+    READ        shift, and go to state 59
+    FALSE       shift, and go to state 60
+    TRUE        shift, and go to state 61
+    LPAREN      shift, and go to state 62
+    MINUS       shift, and go to state 63
+    NOT         shift, and go to state 64
+
+    funcCallExp  go to state 65
+    expression   go to state 134
+    identifier   go to state 67
+    number       go to state 68
+
+
+State 102
+
+   63 expression: expression GT • expression
+
+    IDENTIFIER  shift, and go to state 8
+    NUMBER      shift, and go to state 58
+    READ        shift, and go to state 59
+    FALSE       shift, and go to state 60
+    TRUE        shift, and go to state 61
+    LPAREN      shift, and go to state 62
+    MINUS       shift, and go to state 63
+    NOT         shift, and go to state 64
+
+    funcCallExp  go to state 65
+    expression   go to state 135
+    identifier   go to state 67
+    number       go to state 68
+
+
+State 103
+
+   61 expression: expression LE • expression
+
+    IDENTIFIER  shift, and go to state 8
+    NUMBER      shift, and go to state 58
+    READ        shift, and go to state 59
+    FALSE       shift, and go to state 60
+    TRUE        shift, and go to state 61
+    LPAREN      shift, and go to state 62
+    MINUS       shift, and go to state 63
+    NOT         shift, and go to state 64
+
+    funcCallExp  go to state 65
+    expression   go to state 136
+    identifier   go to state 67
+    number       go to state 68
+
+
+State 104
+
+   62 expression: expression GE • expression
+
+    IDENTIFIER  shift, and go to state 8
+    NUMBER      shift, and go to state 58
+    READ        shift, and go to state 59
+    FALSE       shift, and go to state 60
+    TRUE        shift, and go to state 61
+    LPAREN      shift, and go to state 62
+    MINUS       shift, and go to state 63
+    NOT         shift, and go to state 64
+
+    funcCallExp  go to state 65
+    expression   go to state 137
+    identifier   go to state 67
+    number       go to state 68
+
+
+State 105
+
+   46 expression: identifier LSQUARE • expression RSQUARE
+
+    IDENTIFIER  shift, and go to state 8
+    NUMBER      shift, and go to state 58
+    READ        shift, and go to state 59
+    FALSE       shift, and go to state 60
+    TRUE        shift, and go to state 61
+    LPAREN      shift, and go to state 62
+    MINUS       shift, and go to state 63
+    NOT         shift, and go to state 64
+
+    funcCallExp  go to state 65
+    expression   go to state 138
+    identifier   go to state 67
+    number       go to state 68
+
+
+State 106
+
+   45 expression: identifier DOT • LEN
+
+    LEN  shift, and go to state 139
+
+
+State 107
+
+   35 statement: WHILE expression LCURLY • statementList RCURLY
+
+    $default  reduce using rule 22 (statementList)
+
+    statementList  go to state 140
+
+
+State 108
+
+   37 statement: RETURN expression SEMICOLON •
+
+    $default  reduce using rule 37 (statement)
+
+
+State 109
+
+   24 statement: identifier ASSIGN expression • SEMICOLON
+   49 expression: expression • PLUS expression
+   50           | expression • MINUS expression
+   51           | expression • TIMES expression
+   52           | expression • DIV expression
+   53           | expression • MOD expression
+   57           | expression • AND expression
+   58           | expression • OR expression
+   59           | expression • EQ expression
+   60           | expression • NE expression
+   61           | expression • LE expression
+   62           | expression • GE expression
+   63           | expression • GT expression
+   64           | expression • LT expression
+
+    SEMICOLON  shift, and go to state 141
+    PLUS       shift, and go to state 92
+    MINUS      shift, and go to state 93
+    TIMES      shift, and go to state 94
+    DIV        shift, and go to state 95
+    MOD        shift, and go to state 96
+    AND        shift, and go to state 97
+    OR         shift, and go to state 98
+    NE         shift, and go to state 99
+    EQ         shift, and go to state 100
+    LT         shift, and go to state 101
+    GT         shift, and go to state 102
+    LE         shift, and go to state 103
+    GE         shift, and go to state 104
+
+
+State 110
+
+   39 funcCallExp: identifier LPAREN usedArgs • RPAREN
+   41 usedArgs: usedArgs • COMMA expression
+
+    COMMA   shift, and go to state 119
+    RPAREN  shift, and go to state 142
+
+
+State 111
+
+   25 statement: identifier PLUS ASSIGN • expression SEMICOLON
+
+    IDENTIFIER  shift, and go to state 8
+    NUMBER      shift, and go to state 58
+    READ        shift, and go to state 59
+    FALSE       shift, and go to state 60
+    TRUE        shift, and go to state 61
+    LPAREN      shift, and go to state 62
+    MINUS       shift, and go to state 63
+    NOT         shift, and go to state 64
+
+    funcCallExp  go to state 65
+    expression   go to state 143
+    identifier   go to state 67
+    number       go to state 68
+
+
+State 112
+
+   26 statement: identifier MINUS ASSIGN • expression SEMICOLON
+
+    IDENTIFIER  shift, and go to state 8
+    NUMBER      shift, and go to state 58
+    READ        shift, and go to state 59
+    FALSE       shift, and go to state 60
+    TRUE        shift, and go to state 61
+    LPAREN      shift, and go to state 62
+    MINUS       shift, and go to state 63
+    NOT         shift, and go to state 64
+
+    funcCallExp  go to state 65
+    expression   go to state 144
+    identifier   go to state 67
+    number       go to state 68
+
+
+State 113
+
+   27 statement: identifier TIMES ASSIGN • expression SEMICOLON
+
+    IDENTIFIER  shift, and go to state 8
+    NUMBER      shift, and go to state 58
+    READ        shift, and go to state 59
+    FALSE       shift, and go to state 60
+    TRUE        shift, and go to state 61
+    LPAREN      shift, and go to state 62
+    MINUS       shift, and go to state 63
+    NOT         shift, and go to state 64
+
+    funcCallExp  go to state 65
+    expression   go to state 145
+    identifier   go to state 67
+    number       go to state 68
+
+
+State 114
+
+   28 statement: identifier DIV ASSIGN • expression SEMICOLON
+
+    IDENTIFIER  shift, and go to state 8
+    NUMBER      shift, and go to state 58
+    READ        shift, and go to state 59
+    FALSE       shift, and go to state 60
+    TRUE        shift, and go to state 61
+    LPAREN      shift, and go to state 62
+    MINUS       shift, and go to state 63
+    NOT         shift, and go to state 64
+
+    funcCallExp  go to state 65
+    expression   go to state 146
+    identifier   go to state 67
+    number       go to state 68
+
+
+State 115
+
+   29 statement: identifier MOD ASSIGN • expression SEMICOLON
+
+    IDENTIFIER  shift, and go to state 8
+    NUMBER      shift, and go to state 58
+    READ        shift, and go to state 59
+    FALSE       shift, and go to state 60
+    TRUE        shift, and go to state 61
+    LPAREN      shift, and go to state 62
+    MINUS       shift, and go to state 63
+    NOT         shift, and go to state 64
+
+    funcCallExp  go to state 65
+    expression   go to state 147
+    identifier   go to state 67
+    number       go to state 68
+
+
+State 116
+
+   30 statement: identifier LSQUARE expression • RSQUARE ASSIGN expression SEMICOLON
+   49 expression: expression • PLUS expression
+   50           | expression • MINUS expression
+   51           | expression • TIMES expression
+   52           | expression • DIV expression
+   53           | expression • MOD expression
+   57           | expression • AND expression
+   58           | expression • OR expression
+   59           | expression • EQ expression
+   60           | expression • NE expression
+   61           | expression • LE expression
+   62           | expression • GE expression
+   63           | expression • GT expression
+   64           | expression • LT expression
+
+    PLUS     shift, and go to state 92
+    MINUS    shift, and go to state 93
+    TIMES    shift, and go to state 94
+    DIV      shift, and go to state 95
+    MOD      shift, and go to state 96
+    AND      shift, and go to state 97
+    OR       shift, and go to state 98
+    RSQUARE  shift, and go to state 148
+    NE       shift, and go to state 99
+    EQ       shift, and go to state 100
+    LT       shift, and go to state 101
+    GT       shift, and go to state 102
+    LE       shift, and go to state 103
+    GE       shift, and go to state 104
+
+
+State 117
+
+   14 type: LSQUARE I32 SEMICOLON number RSQUARE •
+
+    $default  reduce using rule 14 (type)
+
+
+State 118
+
+   15 type: LSQUARE BOOL SEMICOLON number RSQUARE •
+
+    $default  reduce using rule 15 (type)
+
+
+State 119
+
+   41 usedArgs: usedArgs COMMA • expression
+
+    IDENTIFIER  shift, and go to state 8
+    NUMBER      shift, and go to state 58
+    READ        shift, and go to state 59
+    FALSE       shift, and go to state 60
+    TRUE        shift, and go to state 61
+    LPAREN      shift, and go to state 62
+    MINUS       shift, and go to state 63
+    NOT         shift, and go to state 64
+
+    funcCallExp  go to state 65
+    expression   go to state 149
+    identifier   go to state 67
+    number       go to state 68
+
+
+State 120
+
+   31 statement: PRINT LPAREN usedArgs RPAREN • SEMICOLON
+
+    SEMICOLON  shift, and go to state 150
+
+
+State 121
+
+   32 statement: PRINTLN LPAREN usedArgs RPAREN • SEMICOLON
+
+    SEMICOLON  shift, and go to state 151
+
+
+State 122
+
+   54 expression: READ LPAREN RPAREN •
+
+    $default  reduce using rule 54 (expression)
+
+
+State 123
+
+   44 expression: LPAREN expression RPAREN •
+
+    $default  reduce using rule 44 (expression)
+
+
+State 124
+
+   21 statementList: statementList • statement
+   33 statement: IF expression LCURLY statementList • RCURLY
+   34          | IF expression LCURLY statementList • RCURLY ELSE LCURLY statementList RCURLY
+
+    RCURLY      shift, and go to state 152
+    IDENTIFIER  shift, and go to state 8
+    SEMICOLON   shift, and go to state 41
+    PRINT       shift, and go to state 42
+    PRINTLN     shift, and go to state 43
+    IF          shift, and go to state 44
+    WHILE       shift, and go to state 45
+    RETURN      shift, and go to state 46
+
+    statement    go to state 47
+    funcCallExp  go to state 48
+    identifier   go to state 49
+
+
+State 125
+
+   49 expression: expression • PLUS expression
+   49           | expression PLUS expression •
+   50           | expression • MINUS expression
+   51           | expression • TIMES expression
+   52           | expression • DIV expression
+   53           | expression • MOD expression
+   57           | expression • AND expression
+   58           | expression • OR expression
+   59           | expression • EQ expression
+   60           | expression • NE expression
+   61           | expression • LE expression
+   62           | expression • GE expression
+   63           | expression • GT expression
+   64           | expression • LT expression
+
+    TIMES  shift, and go to state 94
+    DIV    shift, and go to state 95
+    MOD    shift, and go to state 96
+    AND    shift, and go to state 97
+
+    $default  reduce using rule 49 (expression)
+
+
+State 126
+
+   49 expression: expression • PLUS expression
+   50           | expression • MINUS expression
+   50           | expression MINUS expression •
+   51           | expression • TIMES expression
+   52           | expression • DIV expression
+   53           | expression • MOD expression
+   57           | expression • AND expression
+   58           | expression • OR expression
+   59           | expression • EQ expression
+   60           | expression • NE expression
+   61           | expression • LE expression
+   62           | expression • GE expression
+   63           | expression • GT expression
+   64           | expression • LT expression
+
+    TIMES  shift, and go to state 94
+    DIV    shift, and go to state 95
+    MOD    shift, and go to state 96
+    AND    shift, and go to state 97
+
+    $default  reduce using rule 50 (expression)
+
+
+State 127
+
+   49 expression: expression • PLUS expression
+   50           | expression • MINUS expression
+   51           | expression • TIMES expression
+   51           | expression TIMES expression •
+   52           | expression • DIV expression
+   53           | expression • MOD expression
+   57           | expression • AND expression
+   58           | expression • OR expression
+   59           | expression • EQ expression
+   60           | expression • NE expression
+   61           | expression • LE expression
+   62           | expression • GE expression
+   63           | expression • GT expression
+   64           | expression • LT expression
+
+    $default  reduce using rule 51 (expression)
+
+
+State 128
+
+   49 expression: expression • PLUS expression
+   50           | expression • MINUS expression
+   51           | expression • TIMES expression
+   52           | expression • DIV expression
+   52           | expression DIV expression •
+   53           | expression • MOD expression
+   57           | expression • AND expression
+   58           | expression • OR expression
+   59           | expression • EQ expression
+   60           | expression • NE expression
+   61           | expression • LE expression
+   62           | expression • GE expression
+   63           | expression • GT expression
+   64           | expression • LT expression
+
+    $default  reduce using rule 52 (expression)
+
+
+State 129
+
+   49 expression: expression • PLUS expression
+   50           | expression • MINUS expression
+   51           | expression • TIMES expression
+   52           | expression • DIV expression
+   53           | expression • MOD expression
+   53           | expression MOD expression •
+   57           | expression • AND expression
+   58           | expression • OR expression
+   59           | expression • EQ expression
+   60           | expression • NE expression
+   61           | expression • LE expression
+   62           | expression • GE expression
+   63           | expression • GT expression
+   64           | expression • LT expression
+
+    $default  reduce using rule 53 (expression)
+
+
+State 130
+
+   49 expression: expression • PLUS expression
+   50           | expression • MINUS expression
+   51           | expression • TIMES expression
+   52           | expression • DIV expression
+   53           | expression • MOD expression
+   57           | expression • AND expression
+   57           | expression AND expression •
+   58           | expression • OR expression
+   59           | expression • EQ expression
+   60           | expression • NE expression
+   61           | expression • LE expression
+   62           | expression • GE expression
+   63           | expression • GT expression
+   64           | expression • LT expression
+
+    $default  reduce using rule 57 (expression)
+
+
+State 131
+
+   49 expression: expression • PLUS expression
+   50           | expression • MINUS expression
+   51           | expression • TIMES expression
+   52           | expression • DIV expression
+   53           | expression • MOD expression
+   57           | expression • AND expression
+   58           | expression • OR expression
+   58           | expression OR expression •
+   59           | expression • EQ expression
+   60           | expression • NE expression
+   61           | expression • LE expression
+   62           | expression • GE expression
+   63           | expression • GT expression
+   64           | expression • LT expression
+
+    TIMES  shift, and go to state 94
+    DIV    shift, and go to state 95
+    MOD    shift, and go to state 96
+    AND    shift, and go to state 97
+
+    $default  reduce using rule 58 (expression)
+
+
+State 132
+
+   49 expression: expression • PLUS expression
+   50           | expression • MINUS expression
+   51           | expression • TIMES expression
+   52           | expression • DIV expression
+   53           | expression • MOD expression
+   57           | expression • AND expression
+   58           | expression • OR expression
+   59           | expression • EQ expression
+   60           | expression • NE expression
+   60           | expression NE expression •
+   61           | expression • LE expression
+   62           | expression • GE expression
+   63           | expression • GT expression
+   64           | expression • LT expression
+
+    PLUS   shift, and go to state 92
+    MINUS  shift, and go to state 93
+    TIMES  shift, and go to state 94
+    DIV    shift, and go to state 95
+    MOD    shift, and go to state 96
+    AND    shift, and go to state 97
+    OR     shift, and go to state 98
+
+    $default  reduce using rule 60 (expression)
+
+
+State 133
+
+   49 expression: expression • PLUS expression
+   50           | expression • MINUS expression
+   51           | expression • TIMES expression
+   52           | expression • DIV expression
+   53           | expression • MOD expression
+   57           | expression • AND expression
+   58           | expression • OR expression
+   59           | expression • EQ expression
+   59           | expression EQ expression •
+   60           | expression • NE expression
+   61           | expression • LE expression
+   62           | expression • GE expression
+   63           | expression • GT expression
+   64           | expression • LT expression
+
+    PLUS   shift, and go to state 92
+    MINUS  shift, and go to state 93
+    TIMES  shift, and go to state 94
+    DIV    shift, and go to state 95
+    MOD    shift, and go to state 96
+    AND    shift, and go to state 97
+    OR     shift, and go to state 98
+
+    $default  reduce using rule 59 (expression)
+
+
+State 134
+
+   49 expression: expression • PLUS expression
+   50           | expression • MINUS expression
+   51           | expression • TIMES expression
+   52           | expression • DIV expression
+   53           | expression • MOD expression
+   57           | expression • AND expression
+   58           | expression • OR expression
+   59           | expression • EQ expression
+   60           | expression • NE expression
+   61           | expression • LE expression
+   62           | expression • GE expression
+   63           | expression • GT expression
+   64           | expression • LT expression
+   64           | expression LT expression •
+
+    PLUS   shift, and go to state 92
+    MINUS  shift, and go to state 93
+    TIMES  shift, and go to state 94
+    DIV    shift, and go to state 95
+    MOD    shift, and go to state 96
+    AND    shift, and go to state 97
+    OR     shift, and go to state 98
+
+    $default  reduce using rule 64 (expression)
+
+
+State 135
+
+   49 expression: expression • PLUS expression
+   50           | expression • MINUS expression
+   51           | expression • TIMES expression
+   52           | expression • DIV expression
+   53           | expression • MOD expression
+   57           | expression • AND expression
+   58           | expression • OR expression
+   59           | expression • EQ expression
+   60           | expression • NE expression
+   61           | expression • LE expression
+   62           | expression • GE expression
+   63           | expression • GT expression
+   63           | expression GT expression •
+   64           | expression • LT expression
+
+    PLUS   shift, and go to state 92
+    MINUS  shift, and go to state 93
+    TIMES  shift, and go to state 94
+    DIV    shift, and go to state 95
+    MOD    shift, and go to state 96
+    AND    shift, and go to state 97
+    OR     shift, and go to state 98
+
+    $default  reduce using rule 63 (expression)
+
+
+State 136
+
+   49 expression: expression • PLUS expression
+   50           | expression • MINUS expression
+   51           | expression • TIMES expression
+   52           | expression • DIV expression
+   53           | expression • MOD expression
+   57           | expression • AND expression
+   58           | expression • OR expression
+   59           | expression • EQ expression
+   60           | expression • NE expression
+   61           | expression • LE expression
+   61           | expression LE expression •
+   62           | expression • GE expression
+   63           | expression • GT expression
+   64           | expression • LT expression
+
+    PLUS   shift, and go to state 92
+    MINUS  shift, and go to state 93
+    TIMES  shift, and go to state 94
+    DIV    shift, and go to state 95
+    MOD    shift, and go to state 96
+    AND    shift, and go to state 97
+    OR     shift, and go to state 98
+
+    $default  reduce using rule 61 (expression)
+
+
+State 137
+
+   49 expression: expression • PLUS expression
+   50           | expression • MINUS expression
+   51           | expression • TIMES expression
+   52           | expression • DIV expression
+   53           | expression • MOD expression
+   57           | expression • AND expression
+   58           | expression • OR expression
+   59           | expression • EQ expression
+   60           | expression • NE expression
+   61           | expression • LE expression
+   62           | expression • GE expression
+   62           | expression GE expression •
+   63           | expression • GT expression
+   64           | expression • LT expression
+
+    PLUS   shift, and go to state 92
+    MINUS  shift, and go to state 93
+    TIMES  shift, and go to state 94
+    DIV    shift, and go to state 95
+    MOD    shift, and go to state 96
+    AND    shift, and go to state 97
+    OR     shift, and go to state 98
+
+    $default  reduce using rule 62 (expression)
+
+
+State 138
+
+   46 expression: identifier LSQUARE expression • RSQUARE
+   49           | expression • PLUS expression
+   50           | expression • MINUS expression
+   51           | expression • TIMES expression
+   52           | expression • DIV expression
+   53           | expression • MOD expression
+   57           | expression • AND expression
+   58           | expression • OR expression
+   59           | expression • EQ expression
+   60           | expression • NE expression
+   61           | expression • LE expression
+   62           | expression • GE expression
+   63           | expression • GT expression
+   64           | expression • LT expression
+
+    PLUS     shift, and go to state 92
+    MINUS    shift, and go to state 93
+    TIMES    shift, and go to state 94
+    DIV      shift, and go to state 95
+    MOD      shift, and go to state 96
+    AND      shift, and go to state 97
+    OR       shift, and go to state 98
+    RSQUARE  shift, and go to state 153
+    NE       shift, and go to state 99
+    EQ       shift, and go to state 100
+    LT       shift, and go to state 101
+    GT       shift, and go to state 102
+    LE       shift, and go to state 103
+    GE       shift, and go to state 104
+
+
+State 139
+
+   45 expression: identifier DOT LEN •
+
+    $default  reduce using rule 45 (expression)
+
+
+State 140
+
+   21 statementList: statementList • statement
+   35 statement: WHILE expression LCURLY statementList • RCURLY
+
+    RCURLY      shift, and go to state 154
+    IDENTIFIER  shift, and go to state 8
+    SEMICOLON   shift, and go to state 41
+    PRINT       shift, and go to state 42
+    PRINTLN     shift, and go to state 43
+    IF          shift, and go to state 44
+    WHILE       shift, and go to state 45
+    RETURN      shift, and go to state 46
+
+    statement    go to state 47
+    funcCallExp  go to state 48
+    identifier   go to state 49
+
+
+State 141
+
+   24 statement: identifier ASSIGN expression SEMICOLON •
+
+    $default  reduce using rule 24 (statement)
+
+
+State 142
+
+   39 funcCallExp: identifier LPAREN usedArgs RPAREN •
+
+    $default  reduce using rule 39 (funcCallExp)
+
+
+State 143
+
+   25 statement: identifier PLUS ASSIGN expression • SEMICOLON
+   49 expression: expression • PLUS expression
+   50           | expression • MINUS expression
+   51           | expression • TIMES expression
+   52           | expression • DIV expression
+   53           | expression • MOD expression
+   57           | expression • AND expression
+   58           | expression • OR expression
+   59           | expression • EQ expression
+   60           | expression • NE expression
+   61           | expression • LE expression
+   62           | expression • GE expression
+   63           | expression • GT expression
+   64           | expression • LT expression
+
+    SEMICOLON  shift, and go to state 155
+    PLUS       shift, and go to state 92
+    MINUS      shift, and go to state 93
+    TIMES      shift, and go to state 94
+    DIV        shift, and go to state 95
+    MOD        shift, and go to state 96
+    AND        shift, and go to state 97
+    OR         shift, and go to state 98
+    NE         shift, and go to state 99
+    EQ         shift, and go to state 100
+    LT         shift, and go to state 101
+    GT         shift, and go to state 102
+    LE         shift, and go to state 103
+    GE         shift, and go to state 104
+
+
+State 144
+
+   26 statement: identifier MINUS ASSIGN expression • SEMICOLON
+   49 expression: expression • PLUS expression
+   50           | expression • MINUS expression
+   51           | expression • TIMES expression
+   52           | expression • DIV expression
+   53           | expression • MOD expression
+   57           | expression • AND expression
+   58           | expression • OR expression
+   59           | expression • EQ expression
+   60           | expression • NE expression
+   61           | expression • LE expression
+   62           | expression • GE expression
+   63           | expression • GT expression
+   64           | expression • LT expression
+
+    SEMICOLON  shift, and go to state 156
+    PLUS       shift, and go to state 92
+    MINUS      shift, and go to state 93
+    TIMES      shift, and go to state 94
+    DIV        shift, and go to state 95
+    MOD        shift, and go to state 96
+    AND        shift, and go to state 97
+    OR         shift, and go to state 98
+    NE         shift, and go to state 99
+    EQ         shift, and go to state 100
+    LT         shift, and go to state 101
+    GT         shift, and go to state 102
+    LE         shift, and go to state 103
+    GE         shift, and go to state 104
+
+
+State 145
+
+   27 statement: identifier TIMES ASSIGN expression • SEMICOLON
+   49 expression: expression • PLUS expression
+   50           | expression • MINUS expression
+   51           | expression • TIMES expression
+   52           | expression • DIV expression
+   53           | expression • MOD expression
+   57           | expression • AND expression
+   58           | expression • OR expression
+   59           | expression • EQ expression
+   60           | expression • NE expression
+   61           | expression • LE expression
+   62           | expression • GE expression
+   63           | expression • GT expression
+   64           | expression • LT expression
+
+    SEMICOLON  shift, and go to state 157
+    PLUS       shift, and go to state 92
+    MINUS      shift, and go to state 93
+    TIMES      shift, and go to state 94
+    DIV        shift, and go to state 95
+    MOD        shift, and go to state 96
+    AND        shift, and go to state 97
+    OR         shift, and go to state 98
+    NE         shift, and go to state 99
+    EQ         shift, and go to state 100
+    LT         shift, and go to state 101
+    GT         shift, and go to state 102
+    LE         shift, and go to state 103
+    GE         shift, and go to state 104
+
+
+State 146
+
+   28 statement: identifier DIV ASSIGN expression • SEMICOLON
+   49 expression: expression • PLUS expression
+   50           | expression • MINUS expression
+   51           | expression • TIMES expression
+   52           | expression • DIV expression
+   53           | expression • MOD expression
+   57           | expression • AND expression
+   58           | expression • OR expression
+   59           | expression • EQ expression
+   60           | expression • NE expression
+   61           | expression • LE expression
+   62           | expression • GE expression
+   63           | expression • GT expression
+   64           | expression • LT expression
+
+    SEMICOLON  shift, and go to state 158
+    PLUS       shift, and go to state 92
+    MINUS      shift, and go to state 93
+    TIMES      shift, and go to state 94
+    DIV        shift, and go to state 95
+    MOD        shift, and go to state 96
+    AND        shift, and go to state 97
+    OR         shift, and go to state 98
+    NE         shift, and go to state 99
+    EQ         shift, and go to state 100
+    LT         shift, and go to state 101
+    GT         shift, and go to state 102
+    LE         shift, and go to state 103
+    GE         shift, and go to state 104
+
+
+State 147
+
+   29 statement: identifier MOD ASSIGN expression • SEMICOLON
+   49 expression: expression • PLUS expression
+   50           | expression • MINUS expression
+   51           | expression • TIMES expression
+   52           | expression • DIV expression
+   53           | expression • MOD expression
+   57           | expression • AND expression
+   58           | expression • OR expression
+   59           | expression • EQ expression
+   60           | expression • NE expression
+   61           | expression • LE expression
+   62           | expression • GE expression
+   63           | expression • GT expression
+   64           | expression • LT expression
+
+    SEMICOLON  shift, and go to state 159
+    PLUS       shift, and go to state 92
+    MINUS      shift, and go to state 93
+    TIMES      shift, and go to state 94
+    DIV        shift, and go to state 95
+    MOD        shift, and go to state 96
+    AND        shift, and go to state 97
+    OR         shift, and go to state 98
+    NE         shift, and go to state 99
+    EQ         shift, and go to state 100
+    LT         shift, and go to state 101
+    GT         shift, and go to state 102
+    LE         shift, and go to state 103
+    GE         shift, and go to state 104
+
+
+State 148
+
+   30 statement: identifier LSQUARE expression RSQUARE • ASSIGN expression SEMICOLON
+
+    ASSIGN  shift, and go to state 160
+
+
+State 149
+
+   41 usedArgs: usedArgs COMMA expression •
+   49 expression: expression • PLUS expression
+   50           | expression • MINUS expression
+   51           | expression • TIMES expression
+   52           | expression • DIV expression
+   53           | expression • MOD expression
+   57           | expression • AND expression
+   58           | expression • OR expression
+   59           | expression • EQ expression
+   60           | expression • NE expression
+   61           | expression • LE expression
+   62           | expression • GE expression
+   63           | expression • GT expression
+   64           | expression • LT expression
+
+    PLUS   shift, and go to state 92
+    MINUS  shift, and go to state 93
+    TIMES  shift, and go to state 94
+    DIV    shift, and go to state 95
+    MOD    shift, and go to state 96
+    AND    shift, and go to state 97
+    OR     shift, and go to state 98
+    NE     shift, and go to state 99
+    EQ     shift, and go to state 100
+    LT     shift, and go to state 101
+    GT     shift, and go to state 102
+    LE     shift, and go to state 103
+    GE     shift, and go to state 104
+
+    $default  reduce using rule 41 (usedArgs)
+
+
+State 150
+
+   31 statement: PRINT LPAREN usedArgs RPAREN SEMICOLON •
+
+    $default  reduce using rule 31 (statement)
+
+
+State 151
+
+   32 statement: PRINTLN LPAREN usedArgs RPAREN SEMICOLON •
+
+    $default  reduce using rule 32 (statement)
+
+
+State 152
+
+   33 statement: IF expression LCURLY statementList RCURLY •
+   34          | IF expression LCURLY statementList RCURLY • ELSE LCURLY statementList RCURLY
+
+    ELSE  shift, and go to state 161
+
+    $default  reduce using rule 33 (statement)
+
+
+State 153
+
+   46 expression: identifier LSQUARE expression RSQUARE •
+
+    $default  reduce using rule 46 (expression)
+
+
+State 154
+
+   35 statement: WHILE expression LCURLY statementList RCURLY •
+
+    $default  reduce using rule 35 (statement)
+
+
+State 155
+
+   25 statement: identifier PLUS ASSIGN expression SEMICOLON •
+
+    $default  reduce using rule 25 (statement)
+
+
+State 156
+
+   26 statement: identifier MINUS ASSIGN expression SEMICOLON •
+
+    $default  reduce using rule 26 (statement)
+
+
+State 157
+
+   27 statement: identifier TIMES ASSIGN expression SEMICOLON •
+
+    $default  reduce using rule 27 (statement)
+
+
+State 158
+
+   28 statement: identifier DIV ASSIGN expression SEMICOLON •
+
+    $default  reduce using rule 28 (statement)
+
+
+State 159
+
+   29 statement: identifier MOD ASSIGN expression SEMICOLON •
+
+    $default  reduce using rule 29 (statement)
+
+
+State 160
+
+   30 statement: identifier LSQUARE expression RSQUARE ASSIGN • expression SEMICOLON
+
+    IDENTIFIER  shift, and go to state 8
+    NUMBER      shift, and go to state 58
+    READ        shift, and go to state 59
+    FALSE       shift, and go to state 60
+    TRUE        shift, and go to state 61
+    LPAREN      shift, and go to state 62
+    MINUS       shift, and go to state 63
+    NOT         shift, and go to state 64
+
+    funcCallExp  go to state 65
+    expression   go to state 162
+    identifier   go to state 67
+    number       go to state 68
+
+
+State 161
+
+   34 statement: IF expression LCURLY statementList RCURLY ELSE • LCURLY statementList RCURLY
+
+    LCURLY  shift, and go to state 163
+
+
+State 162
+
+   30 statement: identifier LSQUARE expression RSQUARE ASSIGN expression • SEMICOLON
+   49 expression: expression • PLUS expression
+   50           | expression • MINUS expression
+   51           | expression • TIMES expression
+   52           | expression • DIV expression
+   53           | expression • MOD expression
+   57           | expression • AND expression
+   58           | expression • OR expression
+   59           | expression • EQ expression
+   60           | expression • NE expression
+   61           | expression • LE expression
+   62           | expression • GE expression
+   63           | expression • GT expression
+   64           | expression • LT expression
+
+    SEMICOLON  shift, and go to state 164
+    PLUS       shift, and go to state 92
+    MINUS      shift, and go to state 93
+    TIMES      shift, and go to state 94
+    DIV        shift, and go to state 95
+    MOD        shift, and go to state 96
+    AND        shift, and go to state 97
+    OR         shift, and go to state 98
+    NE         shift, and go to state 99
+    EQ         shift, and go to state 100
+    LT         shift, and go to state 101
+    GT         shift, and go to state 102
+    LE         shift, and go to state 103
+    GE         shift, and go to state 104
+
+
+State 163
+
+   34 statement: IF expression LCURLY statementList RCURLY ELSE LCURLY • statementList RCURLY
+
+    $default  reduce using rule 22 (statementList)
+
+    statementList  go to state 165
+
+
+State 164
+
+   30 statement: identifier LSQUARE expression RSQUARE ASSIGN expression SEMICOLON •
+
+    $default  reduce using rule 30 (statement)
+
+
+State 165
+
+   21 statementList: statementList • statement
+   34 statement: IF expression LCURLY statementList RCURLY ELSE LCURLY statementList • RCURLY
+
+    RCURLY      shift, and go to state 166
+    IDENTIFIER  shift, and go to state 8
+    SEMICOLON   shift, and go to state 41
+    PRINT       shift, and go to state 42
+    PRINTLN     shift, and go to state 43
+    IF          shift, and go to state 44
+    WHILE       shift, and go to state 45
+    RETURN      shift, and go to state 46
+
+    statement    go to state 47
+    funcCallExp  go to state 48
+    identifier   go to state 49
+
+
+State 166
+
+   34 statement: IF expression LCURLY statementList RCURLY ELSE LCURLY statementList RCURLY •
+
+    $default  reduce using rule 34 (statement)

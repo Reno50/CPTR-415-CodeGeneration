@@ -418,12 +418,14 @@ void ReturnStatementNode::emit_code(std::ofstream &context) {
 
     // Check the return expression, result goes onto the stack
     if (expression != nullptr) {
-        context << "# Expression wasn't null!\n";
+        context << "# Expression wasn't null! Emitting expression to store for return\n";
         expression->emit_code(context);
         context << "lw $v0, ($sp)\n";
         context << "addi $sp, $sp, 4\n";
     }
 
+    context << "# Clean up everything - including stack pointer\n";
+    context << "move $sp, $fp\n";
     // Restore frame pointer and return address
     context << "lw $ra, 8($fp)\n";
     context << "lw $fp, 4($fp)\n";
