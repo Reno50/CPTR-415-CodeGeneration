@@ -137,6 +137,7 @@ public:
     ~ReadExpressionNode() override;
     void check_expression(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) override; // Again, likely empty
     RustishType get_type(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) override; // Int??? maybe
+    void emit_code(std::ofstream &context) override;
 };
 
 class TrueExpressionNode: public ExpressionNode {

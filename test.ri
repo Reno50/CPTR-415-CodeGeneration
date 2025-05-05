@@ -1,5 +1,5 @@
 fn func(n: i32) -> i32 { 
-    return n;
+    return n > 7;
 }
 
 fn main() {
@@ -9,4 +9,7 @@ fn main() {
     y = -3;
     x = -4;
     println(func(x));
+    println(func(y));
+    println(func(x) == func(y));
+    println(0 == 0);
 }

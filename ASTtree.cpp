@@ -92,7 +92,8 @@ std::string type_to_string(RustishType r) {
     }
 }
 void custom_error(SemanticError *error) {
-    std::cout << error->msg << "\n";
+    // silence
+    //std::cout << error->msg << "\n";
 }
 
 ASTNode::~ASTNode() {};
@@ -235,7 +236,8 @@ void FuncDefNode::emit_code(std::ofstream &context) {
         context << "# Storing parameter " << var->name << " into " << offset << "($fp)\n";
         if (i < 4) {
             context << "sw $a" << i << ", " << offset << "($fp)\n";
-            std::cout << "Stored parameter " << var->name << " at offset " << offset << "\n";
+            // silence
+            // std::cout << "Stored parameter " << var->name << " at offset " << offset << "\n";
         } else {
             // Arguments beyond $a3 are passed on the caller's stack.
             // Assume caller placed them beneath $ra/$fp — we'll load them from the caller’s $sp.
@@ -331,7 +333,8 @@ void FuncBodyNode::emit_code(std::ofstream &context) {
     for (auto j = local_var_decs->map.begin(); j != local_var_decs->map.end(); j++) {
         // Each variable has a size, and a stack offset
         if (j->second->size % 4 != 0) {
-            std::cout << "Size of variable " << j->first << " didn't have size divisible by 4!\n";
+            // Silence
+            // std::cout << "Size of variable " << j->first << " didn't have size divisible by 4!\n";
         }
         context << "# Allocating space for " << j->first << ", which requires " << j->second->size << " bytes, and setting it to 0\n";
         for (int k = 0; k < j->second->size / 4; k++) { // First is name, second is VariableInfo
@@ -342,7 +345,9 @@ void FuncBodyNode::emit_code(std::ofstream &context) {
             current_offset -= 4;
         } // I'm sure this is a little unneccessary - but in the alarming case that something takes 5 bytes, it will technically be fine
         // This offset is from the 'top' of the stack, which is the highest address - stack grows from high to low numbers
-        std::cout << "Setting variable " << j->second->name << "'s offset to " << current_offset << "\n";
+
+        // Silence
+        // std::cout << "Setting variable " << j->second->name << "'s offset to " << current_offset << "\n";
         j->second->stack_offset = current_offset; // This will be 4 if it is the first variable - i.e., 4 minus what it was before
     }
     for (int i = 0; i < statement_list->size(); i++) {
@@ -1047,6 +1052,15 @@ void ReadExpressionNode::check_expression(FuncSymbolTable *func_defs, VarSymbolT
 
 RustishType ReadExpressionNode::get_type(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) {return RustishType::i32_t; };
 
+void ReadExpressionNode::emit_code(std::ofstream &context) {
+    context << "# Read integer input expression\n";
+    context << "li $v0, 5\n";
+    context << "syscall\n";
+    context << "# Push the read value onto the stack\n";
+    context << "addi $sp, $sp, -4\n";
+    context << "sw $v0, 0($sp)\n";
+}
+
 BinaryExpressionNode::BinaryExpressionNode(ExpressionNode *left_operand, ExpressionNode *right_operand, BinaryOperator op, int line_num):
     left_operand(left_operand), right_operand(right_operand), op(op), line_num(line_num) {};
 
@@ -1279,7 +1293,8 @@ void IdentifierExpressionNode::emit_code(std::ofstream &context) {
         var = stored_params->lookup(*(identifier->identifier));
     }
     if (var == nullptr) {
-        std::cout << "Compilation problem! Couldn't find the identifier " << *(identifier->identifier) << "!\n";
+        // Silence
+        // std::cout << "Compilation problem! Couldn't find the identifier " << *(identifier->identifier) << "!\n";
         return;
     }
     context << "# Load variable " << *(identifier->identifier) << " into $t0, and put it on the stack at the end\n";
