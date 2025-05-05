@@ -80,11 +80,13 @@ public:
     int line_num;
     IdentifierNode *identifier;
     std::vector<ExpressionNode *> *used_args;
+    FuncInfo *stored_func;
 
     FuncCallExpressionNode(IdentifierNode *identifier, std::vector<ExpressionNode *> *used_args, int line_num);
     ~FuncCallExpressionNode() override;
     void check_expression(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) override;
     RustishType get_type(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) override; // Relies on the FuncDefNode symbol table
+    void emit_code(std::ofstream &context) override;
 };
 
 class NumberExpressionNode: public ExpressionNode {
@@ -302,6 +304,7 @@ public:
     FuncCallStatementNode(FuncCallExpressionNode *);
     ~FuncCallStatementNode() override;
     void check_leaf_expressions(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) override;
+    void emit_code(std::ofstream &context) override; // error so I remember to fix
 };
 
 class ReturnStatementNode: public StatementNode {
@@ -311,6 +314,7 @@ public:
     ~ReturnStatementNode() override;
     void check_leaf_expressions(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) override;
     bool special_check(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars, std::string func);
+    void emit_code(std::ofstream &context) override;
 };
 
 class VarDecNode: public ASTNode {
@@ -343,6 +347,7 @@ public:
     FuncDefNode(IdentifierNode *name, VarSymbolTable *params_list, std::vector<VariableInfo *> *params_vector, TypeNode *return_type, FuncBodyNode *body);
     ~FuncDefNode() override;
     void check_body(FuncSymbolTable *global_funcs);
+    void emit_code(std::ofstream &context) override;
 };
 
 class MainDefNode: public ASTNode {

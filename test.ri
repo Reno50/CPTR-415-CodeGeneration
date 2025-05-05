@@ -1,17 +1,12 @@
+fn func(n: i32) -> i32 { 
+    return n;
+}
+
 fn main() {
     let mut x: i32;
     let mut y: i32;
-    let mut z: i32;
-    y = 1;
-    x = 4;
-    z = 0;
-    if (z) {
-        println(x+(z/y));
-    } else {
-        println(y);
-    }
-    while z < 3 {
-        println(2);
-        z = z + 1;
-    }
+
+    y = -3;
+    x = -4;
+    println(func(x));
 }

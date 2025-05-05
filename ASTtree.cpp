@@ -179,6 +179,11 @@ MainDefNode::~MainDefNode() {
 void MainDefNode::emit_code(std::ofstream &context) {
     context << ".globl main\n";
     context << "main:\n";
+    context << "# Put the frame pointer and return address on the stack\n";
+    context << "addi $sp, $sp, -8\n";
+    context << "sw $ra, 4($sp)\n";
+    context << "sw $fp, 8($sp)\n";
+    context << "move $fp, $sp\n";
     context << "# Now, all the statements that are part of main...\n";
     func_body->emit_code(context);
     context << "# Exit\n";
@@ -204,6 +209,52 @@ FuncDefNode::~FuncDefNode() {
 void FuncDefNode::check_body(FuncSymbolTable *global_funcs) {
     body->check_statements(global_funcs, params_list);
     body->check_return_statement(global_funcs, params_list, (*name->identifier));
+}
+
+void FuncDefNode::emit_code(std::ofstream &context) {
+    std::string func_name = *(name->identifier);
+
+    context << "# Begin function " << func_name << "\n";
+    context << func_name << ":\n";
+
+    /* First, store the frame pointer and return address onto the stack */
+    context << "# Store the old frame pointer and the return address onto the stack - then, set the new frame pointer \n";
+    context << "# To access these, do 4($fp) and 8($fp)\n";
+    context << "addi $sp, $sp, -8\n";
+    context << "sw $ra, 8($sp)\n";
+    context << "sw $fp, 4($sp)\n";
+    context << "addi $fp, $sp, 0\n";
+
+    // Store params
+    // These values are passed in $a0–$a3 (or on the stack beyond that)
+    for (size_t i = 0; i < params_vector->size(); ++i) {
+        VariableInfo* var = params_vector->at(i);
+        int offset = 0;
+        var->stack_offset = offset;   // stack_offset is relative to $fp
+
+        context << "# Storing parameter " << var->name << " into " << offset << "($fp)\n";
+        if (i < 4) {
+            context << "sw $a" << i << ", " << offset << "($fp)\n";
+            std::cout << "Stored parameter " << var->name << " at offset " << offset << "\n";
+        } else {
+            // Arguments beyond $a3 are passed on the caller's stack.
+            // Assume caller placed them beneath $ra/$fp — we'll load them from the caller’s $sp.
+            int caller_arg_offset = (int)((i - 4) * 4); // Offset from caller's $sp
+            context << "lw $t0, " << caller_arg_offset << "($fp)\n";
+            context << "sw $t0, " << offset << "($fp)\n";
+        }
+    }
+
+    // Emit function body
+    context << "# Function body\n";
+    body->emit_code(context);
+
+    context << "# Default return if no explicit return was emitted - doesn't return any value\n";
+    context << "lw $ra, 8($fp)\n";
+    context << "lw $fp, 4($fp)\n";
+    context << "jr $ra\n";
+
+    context << "# End of function " << func_name << "\n\n";
 }
 
 StatementNode::~StatementNode() = default;
@@ -273,15 +324,7 @@ void FuncBodyNode::check_return_statement(FuncSymbolTable *funcs, VarSymbolTable
 }
 
 void FuncBodyNode::emit_code(std::ofstream &context) {
-    /* First, store the frame pointer and return address onto the stack */
-    context << "# Store the old frame pointer and the return address onto the stack - then, set the new frame pointer \n";
-    context << "# To access these, do 4($fp) and 8($fp)\n";
-    context << "sw $ra, -4($sp)\n";
-    context << "sw $fp, -8($sp)\n";
-    context << "addi $fp, $sp, -8\n";
-    context << "addi $sp, $sp, -8\n";
-
-    /* Next, emit code dealing with local variables -
+    /* First, emit code dealing with local variables -
         This will involve adding each to the stack, and setting each variable's stack offset
     */
     int current_offset = 0;
@@ -365,6 +408,24 @@ bool ReturnStatementNode::special_check(FuncSymbolTable *func_defs, VarSymbolTab
     return true;
 }
 
+void ReturnStatementNode::emit_code(std::ofstream &context) {
+    context << "# Return statement\n";
+
+    // Check the return expression, result goes onto the stack
+    if (expression != nullptr) {
+        context << "# Expression wasn't null!\n";
+        expression->emit_code(context);
+        context << "lw $v0, ($sp)\n";
+        context << "addi $sp, $sp, 4\n";
+    }
+
+    // Restore frame pointer and return address
+    context << "lw $ra, 8($fp)\n";
+    context << "lw $fp, 4($fp)\n";
+    context << "jr $ra\n";
+}
+
+
 FuncCallStatementNode::FuncCallStatementNode(FuncCallExpressionNode *func_call_exp):
     func_call_exp(func_call_exp) {};
 
@@ -375,6 +436,10 @@ FuncCallStatementNode::~FuncCallStatementNode() {
 void FuncCallStatementNode::check_leaf_expressions(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) {
     func_call_exp->check_expression(func_defs, params, local_vars);
     // This check expression should check if the params match, as it has all of the information while the statement doesn't necessarily
+}
+
+void FuncCallStatementNode::emit_code(std::ofstream &context) {
+    func_call_exp->emit_code(context);
 }
 
 WhileStatementNode::WhileStatementNode(ExpressionNode *condition, std::vector<StatementNode *> *statement_list):
@@ -911,7 +976,7 @@ void UnaryMinusExpressionNode::emit_code(std::ofstream &context) {
     operand->emit_code(context);
     context << "# Unary minus - set number at top of stack to a negative number\n";
     context << "lw $t0, ($sp)\n";
-    context << "neg $t0, $t0\n";
+    context << "sub $t0, $zero, $t0\n";
     context << "sw $t0, ($sp)\n";
 }
 
@@ -1298,6 +1363,7 @@ void FuncCallExpressionNode::check_expression(FuncSymbolTable *func_defs, VarSym
             custom_error(err);
             delete err;
         }
+        stored_func = func;
     } else {
         SemanticError *err = new SemanticError;
         err->line_num = line_num;
@@ -1334,6 +1400,49 @@ RustishType FuncCallExpressionNode::get_type(FuncSymbolTable *func_defs, VarSymb
     type = RustishType::i32_t;
     return RustishType::i32_t;
 }
+
+void FuncCallExpressionNode::emit_code(std::ofstream &context) {
+    context << "# Begin function call to " << *(identifier->identifier) << "\n";
+
+    // Save return address ($ra)
+    context << "# Save return address\n";
+    context << "addi $sp, $sp, -4\n";
+    context << "sw $ra, 0($sp)\n";
+
+    // Emit code for all arguments
+    for (ExpressionNode* arg : *used_args) {
+        arg->emit_code(context); // push each argument to the stack
+    }
+
+    // Move top stack values into $a0-$a3 (or keep on stack if >4)
+    for (size_t i = 0; i < used_args->size(); ++i) {
+        if (i < 4) {
+            context << "# Pop argument " << i << " into $a" << i << "\n";
+            context << "lw $a" << i << ", 0($sp)\n";
+            context << "addi $sp, $sp, 4\n";
+        }
+        // If more than 4 args, leave on stack - ORDER IS IMPORTANT
+        // $a0 is the most recently added TO the stack, so it will be the LAST argument
+    }
+
+    // Jump and link to function
+    context << "jal " << *(identifier->identifier) << "\n";
+
+    // Restore return address
+    context << "# Restore return address\n";
+    context << "lw $ra, 0($sp)\n";
+    context << "addi $sp, $sp, 4\n";
+
+    if (!stored_func->void_func) {
+        // Push return value onto the stack
+        context << "# Push return value onto stack - function wasn't void\n";
+        context << "addi $sp, $sp, -4\n";
+        context << "sw $v0, 0($sp)\n";
+    }
+
+    context << "# End function call to " << *(identifier->identifier) << "\n";
+}
+
 
 IdentifierNode::IdentifierNode(std::string *identifier, int line_num):
     identifier(identifier), line_num(line_num) {};
