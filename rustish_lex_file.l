@@ -183,13 +183,6 @@ identifier [a-zA-Z_]([a-zA-Z]|[0-9]|_)*
     return NUMBER;
 }
 
-\-(0|[1-9][0-9]*) {
-    add_token(yylineno, "NUMBER", yytext);
-    yylval.token = (TokenData*) malloc(sizeof(TokenData));
-    yylval.token->value = yytext;
-    return NUMBER;
-}
-
 "\." {
     add_token(yylineno, "DOT", "");
     return DOT;

@@ -469,7 +469,7 @@ extern int yylex (void);
 #undef yyTABLES_NAME
 #endif
 
-#line 297 "rustish_lex_file.l"
+#line 290 "rustish_lex_file.l"
 
 
 #line 476 "lex.yy.hpp"

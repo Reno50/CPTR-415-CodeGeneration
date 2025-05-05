@@ -177,6 +177,7 @@ public:
     ~UnaryMinusExpressionNode() override;
     void check_expression(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) override; // Operand should be an int
     RustishType get_type(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) override; // Int
+    void emit_code(std::ofstream &context) override;
 };
 
 class ArrayAccessExpressionNode: public ExpressionNode {
@@ -271,7 +272,7 @@ public:
     IfStatementNode(ExpressionNode *condition, std::vector<StatementNode *> *statement_list);
     ~IfStatementNode() override;
     void check_leaf_expressions(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) override;
-    void emit_code(std::ofstream &context);
+    void emit_code(std::ofstream &context) override;
 };
 
 class IfElseStatementNode: public StatementNode {
@@ -282,7 +283,7 @@ public:
     IfElseStatementNode(ExpressionNode *condition, std::vector<StatementNode *> *if_statement_list, std::vector<StatementNode *> *else_statement_list);
     ~IfElseStatementNode() override;
     void check_leaf_expressions(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) override;
-    void emit_code(std::ofstream &context);
+    void emit_code(std::ofstream &context) override;
 };
 
 class WhileStatementNode: public StatementNode {
@@ -292,7 +293,7 @@ public:
     WhileStatementNode(ExpressionNode *condition, std::vector<StatementNode *> *statement_list);
     ~WhileStatementNode() override;
     void check_leaf_expressions(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) override;
-    void emit_code(std::ofstream &context);
+    void emit_code(std::ofstream &context) override;
 };
 
 class FuncCallStatementNode: public StatementNode {

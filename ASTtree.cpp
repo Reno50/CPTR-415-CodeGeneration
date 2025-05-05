@@ -5,7 +5,6 @@
 #include <typeinfo>
 #include "ASTtree.h"
 
-int comparison_branch_count = 0;
 int if_counter = 0;
 int loop_counter = 0;
 
@@ -59,33 +58,25 @@ void push_val_onto_stack(std::ofstream &context, std::string reg) {
 
 void emit_comparison(std::ofstream &context, std::string result_reg, BinaryOperator op) {
     // Haven't tested this much yet
-    std::string true_label = "cmp_true_" + std::to_string(comparison_branch_count);
-    std::string end_label = "cmp_end_" + std::to_string(comparison_branch_count);
-    comparison_branch_count++;
-
     context << "# Perform comparison: if ($t1 " << bin_op_to_string(op) << " $t0), set " << bin_op_to_string(op) << " = 1, else 0\n";
 
+    // Use xor with 1 for not
     // Emit the appropriate branch instruction
     if (op == BinaryOperator::LT_OP)
-        context << "blt $t1, $t0, " << true_label << "\n";
+        context << "slt $t2, $t1, $t0\n";
+        // seq, neq, sne, slt, sgt, sle, sge
     else if (op == BinaryOperator::LE_OP)
-        context << "ble $t1, $t0, " << true_label << "\n";
+        context << "sle $t2, $t1, $t0;\n";
     else if (op == BinaryOperator::GT_OP)
-        context << "bgt $t1, $t0, " << true_label << "\n";
+        context << "sgt $t2, $t1, $t0\n";
     else if (op == BinaryOperator::GE_OP)
-        context << "bge $t1, $t0, " << true_label << "\n";
+        context << "sge $t2, $t1, $t0\n";
     else if (op == BinaryOperator::EQ_OP)
-        context << "beq $t1, $t0, " << true_label << "\n";
+        context << "seq $t2, $t1, $t0\n";
     else if (op == BinaryOperator::NE_OP)
-        context << "bne $t1, $t0, " << true_label << "\n";
+        context << "sne $t2, $t1, $t0\n";
     
-    context << "li " << result_reg << ", 0\n";
-    context << "j " << end_label << "\n";
-
-    context << true_label << ":\n";
-    context << "li " << result_reg << ", 1\n";
-
-    context << end_label << ":\n";
+    push_val_onto_stack(context, "$t2");
 }
 
 // In this file, I'll start from the top down, because I can and it makes it easier to have in my head
@@ -101,7 +92,7 @@ std::string type_to_string(RustishType r) {
     }
 }
 void custom_error(SemanticError *error) {
-    std::cout << "(Err)";
+    std::cout << error->msg << "\n";
 }
 
 ASTNode::~ASTNode() {};
@@ -914,6 +905,14 @@ void UnaryMinusExpressionNode::check_expression(FuncSymbolTable *func_defs, VarS
 
 RustishType UnaryMinusExpressionNode::get_type(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) {
     return RustishType::i32_t;
+}
+
+void UnaryMinusExpressionNode::emit_code(std::ofstream &context) {
+    operand->emit_code(context);
+    context << "# Unary minus - set number at top of stack to a negative number\n";
+    context << "lw $t0, ($sp)\n";
+    context << "neg $t0, $t0\n";
+    context << "sw $t0, ($sp)\n";
 }
 
 NotExpressionNode::NotExpressionNode(ExpressionNode *operand, int line_num):
