@@ -14,12 +14,6 @@ Array literals don't work yet
 When checking for return statements, while statements will not have their statements checked - doing a comprehensive data flow analysis is the only way of truly implementing this feature
 */
 
-/*
-In this code generation assignment, all code given to our compiler is known to be correct
-ASTNode has a virtual method called emit_code()
-emit_code() writes all code to the file specified in write_code(std::string line), which is defined in ASTtree.cpp
-*/
-
 // The data structure that every token has
 struct TokenData {
     const char *value;
@@ -169,6 +163,7 @@ public:
     ~NotExpressionNode() override;
     void check_expression(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) override; // Must make sure the operand is a bool!!!
     RustishType get_type(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) override; // Again, bool
+    void emit_code(std::ofstream &context);
 };
 
 class UnaryMinusExpressionNode: public ExpressionNode {

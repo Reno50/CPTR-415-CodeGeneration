@@ -66,7 +66,7 @@ void emit_comparison(std::ofstream &context, std::string result_reg, BinaryOpera
         context << "slt $t2, $t1, $t0\n";
         // seq, neq, sne, slt, sgt, sle, sge
     else if (op == BinaryOperator::LE_OP)
-        context << "sle $t2, $t1, $t0;\n";
+        context << "sle $t2, $t1, $t0\n";
     else if (op == BinaryOperator::GT_OP)
         context << "sgt $t2, $t1, $t0\n";
     else if (op == BinaryOperator::GE_OP)
@@ -139,6 +139,7 @@ void ProgramNode::check_funcs() {
 void ProgramNode::emit_code(std::ofstream &context) {
     context << ".data\n";
     context << "_newline_char: .asciiz \"\\n\"\n";
+    context << "_space_char: .asciiz \" \"\n";
     context << "_bool_true: .asciiz \"true\"\n";
     context << "_bool_false: .asciiz \"false\"\n";
     context << "# Will get filled in when we add variables\n";
@@ -623,42 +624,49 @@ PrintlnStatementNode::~PrintlnStatementNode() {
 
 void PrintlnStatementNode::check_leaf_expressions(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) {
     // Just check each used_args, they can be whatever type currently - arrays may result in some undefined behavior though
-    for (int i = 0; i < used_args->size(); i++) {
-        used_args->at(i)->check_expression(func_defs, params, local_vars);
+    if (used_args != nullptr && used_args->size() != 0) {
+        for (int i = 0; i < used_args->size(); i++) {
+            used_args->at(i)->check_expression(func_defs, params, local_vars);
+        }
     }
 }
 
 void PrintlnStatementNode::emit_code(std::ofstream &context) {
     // Emit MIPS assembly via write_code
+    if (used_args != nullptr && used_args->size() != 0) {
+        for (int i = 0; i < used_args->size(); i++) {
+            used_args->at(i)->emit_code(context); // Pushes the expression's value onto the stack
 
-    for (int i = 0; i < used_args->size(); i++) {
-        used_args->at(i)->emit_code(context); // Pushes the expression's value onto the stack
-
-        // Assume an integer - needs some work, as it assumes any variable is an int
-        if (used_args->at(i)->type != RustishType::bool_t && used_args->at(i)->type != RustishType::boolarray_t && used_args->at(i)->type != RustishType::i32array_t) {
-            // If it is an integer... or a type that isn't known
-            // Now, the expression should have added one to the current stack - and $sp now points to the value
-            context << "# Load value from the stack and print it, with a newline\n";
-            context << "lw $a0, ($sp)\n";
-            context << "addi $sp, $sp, 4\n";
-            context << "li $v0, 1\n";
+            // Assume an integer - needs some work, as it assumes any variable is an int
+            if (used_args->at(i)->type != RustishType::bool_t && used_args->at(i)->type != RustishType::boolarray_t && used_args->at(i)->type != RustishType::i32array_t) {
+                // If it is an integer... or a type that isn't known
+                // Now, the expression should have added one to the current stack - and $sp now points to the value
+                context << "# Load value from the stack and print it, with a newline\n";
+                context << "lw $a0, ($sp)\n";
+                context << "addi $sp, $sp, 4\n";
+                context << "li $v0, 1\n";
+                context << "syscall\n";
+            } else if (used_args->at(i)->type == RustishType::bool_t) {
+                // If it is a bool...
+                // Now, the expression should have added one to the current stack - and $sp now points to the value
+                context << "# Load value from the stack and print it, with a newline\n";
+                context << "lw $a0, ($sp)\n";
+                context << "addi $sp, $sp, 4\n";
+                context << "# Now, call the _print_bool function - printing the value that is currently in $a0\n";
+                context << "# jal saves the return address automatically\n";
+                context << "jal _print_bool\n";
+                context << "\n";
+            }
+            // And the space
+            context << "la $a0, _space_char\n";
+            context << "li $v0, 4\n";
             context << "syscall\n";
-        } else if (used_args->at(i)->type == RustishType::bool_t) {
-            // If it is a bool...
-            // Now, the expression should have added one to the current stack - and $sp now points to the value
-            context << "# Load value from the stack and print it, with a newline\n";
-            context << "lw $a0, ($sp)\n";
-            context << "addi $sp, $sp, 4\n";
-            context << "# Now, call the _print_bool function - printing the value that is currently in $a0\n";
-            context << "# jal saves the return address automatically\n";
-            context << "jal _print_bool\n";
-            context << "\n";
         }
-        // And the newline
-        context << "la $a0, _newline_char\n";
-        context << "li $v0, 4\n";
-        context << "syscall\n";
     }
+    // And the newline
+    context << "la $a0, _newline_char\n";
+    context << "li $v0, 4\n";
+    context << "syscall\n";
 }
 
 PrintStatementNode::PrintStatementNode(std::vector<ExpressionNode *> *used_args):
@@ -670,42 +678,49 @@ PrintStatementNode::~PrintStatementNode() {
 
 void PrintStatementNode::check_leaf_expressions(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) {
     // Same as println
-    for (int i = 0; i < used_args->size(); i++) {
-        used_args->at(i)->check_expression(func_defs, params, local_vars);
+    if (used_args != nullptr && used_args->size() != 0) {
+        for (int i = 0; i < used_args->size(); i++) {
+            used_args->at(i)->check_expression(func_defs, params, local_vars);
+        }
     }
 }
 
 void PrintStatementNode::emit_code(std::ofstream &context) {
     // Same as println, arrays may result in no mips code emitted
-
-    for (int i = 0; i < used_args->size(); i++) {
-        used_args->at(i)->emit_code(context); // Pushes the expression's value onto the stack
-        if (used_args->at(i)->type == RustishType::i32_t) {
-            // If it is an integer...
-            // Now, the expression should have added one to the current stack - and $sp now points to the value
-            context << "# Load value from the stack and print it, with a newline\n";
-            context << "lw $a0, ($sp)\n";
-            context << "addi $sp, $sp, 4\n";
-            context << "li $v0, 4\n";
-            context << "syscall\n";
-        } else if (used_args->at(i)->type == RustishType::bool_t) {
-            // If it is a bool...
-            // Now, the expression should have added one to the current stack - and $sp now points to the value
-            context << "# Load value from the stack and print it, with a newline\n";
-            context << "lw $a0, ($sp)\n";
-            context << "addi $sp, $sp, 4\n";
-            context << "# Now, is it a true or false? Value is currently in $a0\n";
-            context << "beqz $a0, False\n";
-            context << "# If it doesn't branch, it is a 1: thus, print true\n";
-            context << "lw $a0, _bool_true\n";
-            context << "False: \n";
-            context << "    lw $a0, _bool_false\n";
+    if (used_args != nullptr && used_args->size() != 0) {
+        for (int i = 0; i < used_args->size(); i++) {
+            used_args->at(i)->emit_code(context); // Pushes the expression's value onto the stack
+            if (used_args->at(i)->type == RustishType::i32_t) {
+                // If it is an integer...
+                // Now, the expression should have added one to the current stack - and $sp now points to the value
+                context << "# Load value from the stack and print it, with a newline\n";
+                context << "lw $a0, ($sp)\n";
+                context << "addi $sp, $sp, 4\n";
+                context << "li $v0, 1\n";
+                context << "syscall\n";
+            } else if (used_args->at(i)->type == RustishType::bool_t) {
+                // If it is a bool...
+                // Now, the expression should have added one to the current stack - and $sp now points to the value
+                context << "# Load value from the stack and print it, with a newline\n";
+                context << "lw $a0, ($sp)\n";
+                context << "addi $sp, $sp, 4\n";
+                context << "# Now, is it a true or false? Value is currently in $a0\n";
+                context << "beqz $a0, False\n";
+                context << "# If it doesn't branch, it is a 1: thus, print true\n";
+                context << "lw $a0, _bool_true\n";
+                context << "False: \n";
+                context << "    lw $a0, _bool_false\n";
+                context << "li $v0, 4\n";
+                context << "syscall\n";
+            }
+            // And the space
+            context << "la $a0, _space_char\n";
             context << "li $v0, 4\n";
             context << "syscall\n";
         }
-        context << "# Print space\n";
-        context << "li $a0, 0x20\n";
-        context << "li $v0, 11\n";
+        // And the space
+        context << "la $a0, _space_char\n";
+        context << "li $v0, 4\n";
         context << "syscall\n";
     }
 }
@@ -1011,6 +1026,14 @@ void NotExpressionNode::check_expression(FuncSymbolTable *func_defs, VarSymbolTa
 
 RustishType NotExpressionNode::get_type(FuncSymbolTable *func_defs, VarSymbolTable *params, VarSymbolTable *local_vars) {
     return RustishType::bool_t;
+}
+
+void NotExpressionNode::emit_code(std::ofstream &context) {
+    operand->emit_code(context);
+    context << "# Not - boolean not operator with one argument\n";
+    context << "lw $t0, ($sp)\n";
+    context << "slti $t0, $t0, 1\n";
+    context << "sw $t0, ($sp)\n";
 }
 
 FalseExpressionNode::FalseExpressionNode(int line_num):

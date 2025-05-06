@@ -268,6 +268,11 @@ identifier [a-zA-Z_]([a-zA-Z]|[0-9]|_)*
     return RETURN;
 }
 
+"!" {
+    add_token(yylineno, "NOT", "");
+    return NOT;
+}
+
 [a-zA-Z_]([a-zA-Z0-9_])* {
     add_token(yylineno, "IDENTIFIER", yytext);
     yylval.token = (TokenData*) malloc(sizeof(TokenData));
